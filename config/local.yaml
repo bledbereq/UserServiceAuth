@@ -1,0 +1,9 @@
+env: "local" 
+
+storage_path: "./data" #Our bd place
+
+token_ttl: 2h
+
+grpc:
+  port: 44044
+  timeout: 10s
