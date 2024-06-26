@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package auth;
 
-option go_package = "github.com/bledbereq/UserServiceAuth/gen/go/auth;ssov1";
+option go_package = "github.com/bledbereq/UserServiceAuth/gen/go;ssov1";
 
 // Auth is service for managing permissions and roles.
 service Auth {
@@ -15,8 +15,7 @@ service Auth {
 message RegisterRequest {
   string email = 1; 
   string password = 2; 
-  string surname =3;
-  string name =4;
+
 }
 
 message RegisterResponse {
@@ -41,3 +40,5 @@ message IsAdminRequest {
   message IsAdminResponse {
     bool is__admin = 1; 
   }
+
+  
