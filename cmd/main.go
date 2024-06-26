@@ -1,10 +1,13 @@
 package main
 
 import (
+	"UserServiceAuth/internal/app"
+	"UserServiceAuth/internal/config"
 	"fmt"
 	"log/slog"
 	"os"
-	"userServerAuth/internal/config"
+	"os/signal"
+	"syscall"
 )
 
 func main() {
@@ -20,8 +23,22 @@ func main() {
 	log.Error("error message")
 	log.Warn("warn message")
 
+	application := app.New(log, cfg.GRPS.Port, cfg.StoragePath, cfg.TokenTTL)
+	application.GRPCSrv.MustRun()
+
 	// grpc сервер и хендлеры
 	// инициализировать точку входа в приложение
+
+	//Graceful shutdown
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
+
+	<-stop
+
+	application.GRPCSrv.Stop()
+	log.Info("Gracefully stopped")
+
 }
 
 const (
