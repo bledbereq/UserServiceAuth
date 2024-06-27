@@ -2,7 +2,6 @@ package app
 
 import (
 	grpcapp "UserServiceAuth/internal/app/grpc"
-	authgrpc "UserServiceAuth/internal/grpc/auth"
 	"log/slog"
 	"time"
 )
@@ -16,12 +15,12 @@ func New(
 	grpcPort int,
 	storagePath string,
 	tokenTTL time.Duration,
-	authService authgrpc.Auth,
+	//authService authgrpc.Auth,
 ) *App {
 	//Инициализация хранилища
 	// Инициализация сервисного слоя
 
-	grpcApp := grpcapp.New(log, authService, grpcPort)
+	grpcApp := grpcapp.New(log, grpcPort)
 
 	return &App{
 		GRPCSrv: grpcApp,

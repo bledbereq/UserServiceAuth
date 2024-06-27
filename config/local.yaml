@@ -1,9 +1,9 @@
 env: "local" 
 
-storage_path: "./data" #Our bd place
+storage_path: "./storage/sso.db" #Our bd place
 
 token_ttl: 2h
 
 grpc:
   port: 44044
-  timeout: 10s
+  timeout: 10h
