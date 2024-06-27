@@ -6,9 +6,12 @@ import (
 	"UserServiceAuth/lib/logger/handler/slogpretty"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/labstack/echo/v4"
 )
 
 func main() {
@@ -24,8 +27,17 @@ func main() {
 	log.Error("error message")
 	log.Warn("warn message")
 
+	go func() {
+		s := echo.New()
+		s.GET("/status", Handler)
+		if err := s.Start(":33033"); err != nil {
+			log.Error("failed to start HTTP server")
+		}
+	}()
+
+	// Запуск gRPC сервера
 	application := app.New(log, cfg.GRPS.Port, cfg.StoragePath, cfg.TokenTTL)
-	application.GRPCSrv.Run()
+	go application.GRPCSrv.Run()
 
 	// grpc сервер и хендлеры
 	// инициализировать точку входа в приложение
@@ -39,6 +51,7 @@ func main() {
 
 	application.GRPCSrv.Stop()
 	log.Info("Gracefully stopped")
+
 }
 
 const (
@@ -66,6 +79,13 @@ func setupLogger(env string) *slog.Logger {
 	return log
 }
 
+func Handler(ctx echo.Context) error {
+	err := ctx.String(http.StatusOK, "test")
+	if err != nil {
+		return err
+	}
+	return nil
+}
 func setupPrettySlog() *slog.Logger {
 	opts := slogpretty.PrettyHandlerOptions{
 		SlogOpts: &slog.HandlerOptions{
