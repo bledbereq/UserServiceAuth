@@ -18,11 +18,10 @@ type App struct {
 // New creates new gRPC server app.
 func New(
 	log *slog.Logger,
-	authService authgrpc.Auth,
 	port int,
 ) *App {
 	gRPCServer := grpc.NewServer()
-	authgrpc.Register(gRPCServer, authService)
+	authgrpc.Register(gRPCServer)
 
 	return &App{
 		log:        log,
@@ -54,6 +53,8 @@ func (a *App) Run() error {
 		"gRPC Server is running",
 		slog.String("addr", l.Addr().String()),
 	)
+
+	a.gRPCServer.Serve(l)
 	return nil
 }
 
