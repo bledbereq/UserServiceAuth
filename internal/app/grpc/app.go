@@ -1,7 +1,7 @@
 package grpcapp
 
 import (
-	authgrpc "UserServiceAuth/internal/grpc/auth"
+	authgrpc "UserServiceAuth/internal/grpc/publiKey"
 	"fmt"
 	"log/slog"
 	"net"
