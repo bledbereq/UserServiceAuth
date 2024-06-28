@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"UserServiceAuth/internal/functions"
+	"UserServiceAuth/lib/functions"
 	"os"
 	"os/signal"
 	"syscall"
