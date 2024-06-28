@@ -14,7 +14,6 @@ type Config struct {
 	TokenTTL    time.Duration `yaml:"token_ttl" env-required:"true"`
 	GRPS        GRPSconfig    `yaml:"grpc" env-required:"true"`
 }
-
 type GRPSconfig struct {
 	Port    int           `yaml:"port"`
 	Timeout time.Duration `yaml:"timeout"`
