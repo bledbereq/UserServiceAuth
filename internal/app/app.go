@@ -15,10 +15,7 @@ func New(
 	grpcPort int,
 	storagePath string,
 	tokenTTL time.Duration,
-	//authService authgrpc.Auth,
 ) *App {
-	//Инициализация хранилища
-	// Инициализация сервисного слоя
 
 	grpcApp := grpcapp.New(log, grpcPort)
 
