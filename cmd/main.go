@@ -24,7 +24,7 @@ func main() {
 	log.Info("starting app",
 		slog.String("env", cfg.Env),
 		slog.Any("cfg", cfg),
-		slog.Int("port", cfg.GRPS.Port))
+		slog.Int("port", cfg.GRPC.Port))
 	log.Debug("debage message")
 	log.Error("error message")
 	log.Warn("warn message")
@@ -34,13 +34,13 @@ func main() {
 		s := echo.New()
 		s.POST("/register", RegisterHandler)
 		s.POST("/login", LognHandler)
-		if err := s.Start(":33033"); err != nil {
+		if err := s.Start(cfg.RestApi.Port); err != nil {
 			log.Error("failed to start HTTP server")
 		}
 	}()
 
 	// Запуск gRPC сервера
-	application := app.New(log, cfg.GRPS.Port, cfg.StoragePath, cfg.TokenTTL)
+	application := app.New(log, cfg.GRPC.Port, cfg.StoragePath, cfg.TokenTTL)
 	go application.GRPCSrv.Run()
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
@@ -88,6 +88,7 @@ func setupPrettySlog() *slog.Logger {
 
 	return slog.New(handler)
 }
+
 func LognHandler(ctx echo.Context) error {
 	type LoginRequest struct {
 		Username string `json:"username"`
@@ -108,6 +109,7 @@ func LognHandler(ctx echo.Context) error {
 	return ctx.JSON(http.StatusCreated, hashedPassword)
 
 }
+
 func RegisterHandler(ctx echo.Context) error {
 	// Получить данные пользователя из запроса
 	type RegisterRequest struct {

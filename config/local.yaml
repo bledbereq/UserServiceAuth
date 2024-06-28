@@ -8,3 +8,6 @@ grpc:
   port: 44044
   timeout: 30s
 
+restapi:
+  port: :33033
+  timeout: 30s
