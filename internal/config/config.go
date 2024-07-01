@@ -9,17 +9,22 @@ import (
 )
 
 type Config struct {
-	Env         string        `yaml:"env" env-default:"local"`
-	StoragePath string        `yaml:"storage_path" env-required:"true"`
-	TokenTTL    time.Duration `yaml:"token_ttl" env-required:"true"`
-	GRPS        GRPSconfig    `yaml:"grpc" env-required:"true"`
+	Env         string           `yaml:"env" env-default:"local"`
+	StoragePath string           `yaml:"storage_path" env-required:"true"`
+	TokenTTL    time.Duration    `yaml:"token_ttl" env-required:"true"`
+	GRPS        GRPSconfig       `yaml:"grpc" env-required:"true"`
+	HttpServer  HttpServerConfig `yaml:"http_server" env-required:"true"`
 }
 type GRPSconfig struct {
 	Port    int           `yaml:"port"`
 	Timeout time.Duration `yaml:"timeout"`
 }
 
-// internal/config/config.go
+type HttpServerConfig struct {
+	Adress        string        `yaml:"adress" env-default:"localhost:8080"`
+	Timeout       time.Duration `yaml:"timeout" env-default:"4s"`
+	Iddle_timeout time.Duration `yaml:"iddle_timeout" env-default:"60s"`
+}
 
 func MustLoad() *Config {
 	configPath := fetchConfigPath()
