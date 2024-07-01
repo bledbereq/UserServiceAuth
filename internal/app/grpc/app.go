@@ -1,7 +1,7 @@
 package grpcapp
 
 import (
-	authgrpc "UserServiceAuth/internal/grpc/publiKey"
+	publickeygrpc "UserServiceAuth/internal/grpc/publiKey"
 	"fmt"
 	"log/slog"
 	"net"
@@ -21,7 +21,7 @@ func New(
 	port int,
 ) *App {
 	gRPCServer := grpc.NewServer()
-	authgrpc.Register(gRPCServer)
+	publickeygrpc.Register(gRPCServer)
 
 	return &App{
 		log:        log,

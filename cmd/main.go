@@ -6,6 +6,7 @@ import (
 	"UserServiceAuth/lib/logger/handler/slogpretty"
 	"fmt"
 	"log/slog"
+
 	"os"
 	"os/signal"
 	"syscall"

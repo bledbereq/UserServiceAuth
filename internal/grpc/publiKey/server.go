@@ -1,4 +1,4 @@
-package authgrpc
+package publickeygrpc
 
 import (
 	"context"
@@ -9,11 +9,11 @@ import (
 )
 
 type serverAPI struct {
-	ssov1.UnimplementedAuthServer
+	ssov1.UnimplementedGetPublicKeyServer
 }
 
 func Register(gRPC *grpc.Server) {
-	ssov1.RegisterAuthServer(gRPC, &serverAPI{})
+	ssov1.RegisterGetPublicKeyServer(gRPC, &serverAPI{})
 
 }
 

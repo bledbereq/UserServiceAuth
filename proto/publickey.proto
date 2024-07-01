@@ -1,18 +1,16 @@
 syntax = "proto3";
 
-package auth;
+package publickey;
 
 option go_package = "github.com/bledbereq/UserServiceAuth/gen/go;ssov1";
 
-// Auth is service for managing permissions and roles.
-service Auth {
+service GetPublicKey {
   rpc PublicKey (PublicKeyRequest) returns (PublicKeyResponse);
 
 }
 
 // Объект, который отправляется при вызове RPC-метода Register.
 message PublicKeyRequest {
-  string jwtToken = 1; 
 }
 
 message PublicKeyResponse {
