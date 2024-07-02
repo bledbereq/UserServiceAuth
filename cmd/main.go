@@ -2,6 +2,7 @@ package main
 
 import (
 	"UserServiceAuth/internal/config"
+	auth "UserServiceAuth/internal/router"
 	"context"
 	"flag"
 	"fmt"
@@ -11,9 +12,6 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-
-	"UserServiceAuth/internal/httphandler/login"
-	"UserServiceAuth/internal/httphandler/register"
 
 	"github.com/labstack/echo/v4"
 )
@@ -34,10 +32,13 @@ func main() {
 	fmt.Println(cfg)
 	log := setupLogger(cfg.Env)
 
+	// Создание обработчиков
+	loginHandler := auth.NewLoginHandler()
+	registerHandler := auth.NewRegisterHandler()
+
 	// Создание сервера Echo
 	e := echo.New()
-	e.POST("/register", register.RegisterHandler)
-	e.POST("/login", login.LognHandler)
+	auth.SetupRoutes(e, loginHandler, registerHandler)
 
 	// Запуск сервера в отдельной горутине
 	go func() {
