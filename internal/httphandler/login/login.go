@@ -16,5 +16,5 @@ func LognHandler(ctx echo.Context) error {
 		return err
 	}
 
-	return ctx.JSON(http.StatusCreated, "jwt")
+	return ctx.JSON(http.StatusCreated, "1jwt1")
 }
