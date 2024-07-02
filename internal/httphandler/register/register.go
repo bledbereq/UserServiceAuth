@@ -1,23 +1,11 @@
-package main
+package register
 
 import (
 	"net/http"
 
-	"github.com/labstack/echo/v4"
+	echo "github.com/labstack/echo/v4"
 )
 
-func LognHandler(ctx echo.Context) error {
-	type LoginRequest struct {
-		Login    string `json:"login"`
-		Password string `json:"password"`
-	}
-	req := &LoginRequest{}
-	if err := ctx.Bind(req); err != nil {
-		return err
-	}
-
-	return ctx.JSON(http.StatusCreated, "jwt")
-}
 func RegisterHandler(ctx echo.Context) error {
 	// Получить данные пользователя из запроса
 	type RegisterRequest struct {

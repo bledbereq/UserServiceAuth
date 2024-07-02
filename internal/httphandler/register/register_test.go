@@ -1,10 +1,12 @@
-package main
+package register_test
 
 import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"UserServiceAuth/internal/httphandler/register"
 
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
@@ -16,7 +18,7 @@ func TestRegister(t *testing.T) {
 	e := echo.New()
 
 	// Установить маршрут для регистрации пользователя
-	e.POST("/register", RegisterHandler)
+	e.POST("/register", register.RegisterHandler)
 
 	// Создать тестовый запрос
 	req := httptest.NewRequest(http.MethodPost, "/register", strings.NewReader(`{

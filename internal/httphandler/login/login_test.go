@@ -1,10 +1,12 @@
-package main
+package login_test
 
 import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"UserServiceAuth/internal/httphandler/login"
 
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
@@ -16,7 +18,7 @@ func TestLogin(t *testing.T) {
 	e := echo.New()
 
 	// Установить маршрут для регистрации пользователя
-	e.POST("/login", RegisterHandler)
+	e.POST("/login", login.LognHandler)
 
 	// Создать тестовый запрос
 	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(`{
