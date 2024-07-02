@@ -6,9 +6,7 @@ import (
 	"UserServiceAuth/lib/logger/handler/slogpretty"
 	"fmt"
 	"log/slog"
-	"net/http"
 
-	"UserServiceAuth/lib/functions"
 	"os"
 	"os/signal"
 	"syscall"
@@ -34,7 +32,7 @@ func main() {
 		s := echo.New()
 		s.POST("/register", RegisterHandler)
 		s.POST("/login", LognHandler)
-		if err := s.Start(cfg.RestApi.Port); err != nil {
+		if err := s.Start(":33033"); err != nil {
 			log.Error("failed to start HTTP server")
 		}
 	}()
@@ -87,48 +85,4 @@ func setupPrettySlog() *slog.Logger {
 	handler := opts.NewPrettyHandler(os.Stdout)
 
 	return slog.New(handler)
-}
-
-func LognHandler(ctx echo.Context) error {
-	type LoginRequest struct {
-		Username string `json:"username"`
-		Surname  string `json:"surname"`
-		Login    string `json:"login"`
-		Password string `json:"password"`
-	}
-	req := &LoginRequest{}
-	if err := ctx.Bind(req); err != nil {
-		return err
-	}
-
-	// Хешировать пароль
-	hashedPassword, err := functions.HashPassword(req.Password)
-	if err != nil {
-		return err
-	}
-	return ctx.JSON(http.StatusCreated, hashedPassword)
-
-}
-
-func RegisterHandler(ctx echo.Context) error {
-	// Получить данные пользователя из запроса
-	type RegisterRequest struct {
-		Username string `json:"username"`
-		Surname  string `json:"surname"` // indirect
-		Login    string `json:"login"`
-		Password string `json:"password"`
-	}
-	req := &RegisterRequest{}
-	if err := ctx.Bind(req); err != nil {
-		return err
-	}
-
-	// Хешировать пароль
-	hashedPassword, err := functions.HashPassword(req.Password)
-	if err != nil {
-		return err
-	}
-
-	// Отправить ответ с данными пользователя
-	return ctx.JSON(http.StatusCreated, hashedPassword)
 }
