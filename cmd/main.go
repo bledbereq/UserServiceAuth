@@ -32,13 +32,12 @@ func main() {
 	fmt.Println(cfg)
 	log := setupLogger(cfg.Env)
 
-	// Создание обработчиков
-	loginHandler := auth.NewLoginHandler()
-	registerHandler := auth.NewRegisterHandler()
-
 	// Создание сервера Echo
 	e := echo.New()
-	auth.SetupRoutes(e, loginHandler, registerHandler)
+
+	// Создание роутера
+	httpRouter := auth.NewHttpRouter(e)
+	_ = httpRouter
 
 	// Запуск сервера в отдельной горутине
 	go func() {
