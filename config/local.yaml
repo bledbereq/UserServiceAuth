@@ -1,6 +1,6 @@
 env: "local" 
 
-storage_path: "./storage/sso.db" #Our bd place
+storage_path: "./storage/sso.db" 
 
 token_ttl: 2h
 
@@ -8,6 +8,8 @@ grpc:
   port: 44044
   timeout: 30s
 
-restapi:
-  port: :33033
-  timeout: 30s
+http_server:
+  adress: "localhost:8082"
+  timeout: 4s
+  iddle_timeout: 60s
+  
