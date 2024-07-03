@@ -48,8 +48,8 @@ func TestHandleLogin_InvalidRequest(t *testing.T) {
 
 	assert.Equal(http.StatusBadRequest, rec.Code)
 
-	// Проверяем, что в ответе есть ключ error, связанный с валидацией поля login
-	expectedResponse := `{"error":"Key: 'LoginRequest.Login' Error:Field validation for 'Login' failed on the 'required' tag"}`
+	// Проверяем, что в ответе есть ключ error и details, связанные с валидацией поля login
+	expectedResponse := `{"error": "Ошибка валидации", "details": "Key: 'LoginRequest.Login' Error:Field validation for 'Login' failed on the 'required' tag"}`
 	assert.JSONEq(expectedResponse, rec.Body.String())
 
 	assert.NoError(err) // Не ожидаем ошибки валидации, только статус ошибки в ответе
@@ -93,8 +93,8 @@ func TestHandleRegister_InvalidRequest(t *testing.T) {
 
 	assert.Equal(http.StatusBadRequest, rec.Code)
 
-	// Проверяем, что в ответе есть ключ error, связанный с валидацией поля username
-	expectedResponse := `{"error":"Key: 'RegisterRequest.Username' Error:Field validation for 'Username' failed on the 'required' tag"}`
+	// Проверяем, что в ответе есть ключ error и details, связанные с валидацией поля username
+	expectedResponse := `{"error": "Ошибка валидации", "details": "Key: 'RegisterRequest.Username' Error:Field validation for 'Username' failed on the 'required' tag"}`
 	assert.JSONEq(expectedResponse, rec.Body.String())
 
 	assert.NoError(err) // Не ожидаем ошибки валидации, только статус ошибки в ответе

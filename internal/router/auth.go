@@ -7,11 +7,12 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+// HttpRouter представляет маршрутизатор HTTP с зависимостями и сервисами
 type HttpRouter struct {
-	//  зависимости или сервисы
 	validator *validator.Validate
 }
 
+// NewHttpRouter создает новый HttpRouter и настраивает маршруты
 func NewHttpRouter(e *echo.Echo) *HttpRouter {
 	// Создание экземпляра валидатора
 	validator := validator.New()
@@ -31,26 +32,29 @@ func NewHttpRouter(e *echo.Echo) *HttpRouter {
 	return router
 }
 
-// Специальный валидатор для Echo, который использует go-playground/validator
+// CustomValidator представляет специальный валидатор для Echo, который использует go-playground/validator
 type CustomValidator struct {
 	validator *validator.Validate
 }
 
+// Validate валидирует структуру i с помощью внешнего валидатора и возвращает HTTP-ошибку, если валидация не прошла
 func (cv *CustomValidator) Validate(i interface{}) error {
-	// Валидируем структуру i с помощью внешнего валидатора
 	if err := cv.validator.Struct(i); err != nil {
-		// Если есть ошибки валидации, создаем HTTP ошибку с кодом 400 и сообщением об ошибке
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		return echo.NewHTTPError(http.StatusBadRequest, map[string]interface{}{
+			"error":   "Ошибка валидации",
+			"details": err.Error(),
+		})
 	}
 	return nil
 }
 
-// Обработчик для /login
+// handleLogin обрабатывает запросы на /login
 func (h *HttpRouter) handleLogin(ctx echo.Context) error {
 	type LoginRequest struct {
 		Login    string `json:"login" validate:"required"`
 		Password string `json:"password" validate:"required"`
 	}
+
 	req := &LoginRequest{}
 	if err := ctx.Bind(req); err != nil {
 		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": "Неверный формат запроса"})
@@ -58,15 +62,19 @@ func (h *HttpRouter) handleLogin(ctx echo.Context) error {
 
 	// Проверка валидности полей запроса
 	if err := h.validator.Struct(req); err != nil {
-		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return ctx.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error":   "Ошибка валидации",
+			"details": err.Error(),
+		})
 	}
 
 	// Логика обработки логина с использованием юзкейсов
+	// ...
 
 	return ctx.JSON(http.StatusCreated, "1jwt1")
 }
 
-// Обработчик для /register
+// handleRegister обрабатывает запросы на /register
 func (h *HttpRouter) handleRegister(ctx echo.Context) error {
 	type RegisterRequest struct {
 		Username string `json:"username" validate:"required"`
@@ -75,6 +83,7 @@ func (h *HttpRouter) handleRegister(ctx echo.Context) error {
 		Login    string `json:"login" validate:"required"`
 		Password string `json:"password" validate:"required"`
 	}
+
 	req := &RegisterRequest{}
 	if err := ctx.Bind(req); err != nil {
 		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": "Неверный формат запроса"})
@@ -82,10 +91,14 @@ func (h *HttpRouter) handleRegister(ctx echo.Context) error {
 
 	// Проверка валидности полей запроса
 	if err := h.validator.Struct(req); err != nil {
-		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return ctx.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error":   "Ошибка валидации",
+			"details": err.Error(),
+		})
 	}
 
 	// Логика обработки регистрации с использованием юзкейсов
+	// ...
 
 	return ctx.JSON(http.StatusCreated, "1jwt1")
 }
