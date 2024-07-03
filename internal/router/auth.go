@@ -37,7 +37,9 @@ type CustomValidator struct {
 }
 
 func (cv *CustomValidator) Validate(i interface{}) error {
+	// Валидируем структуру i с помощью внешнего валидатора
 	if err := cv.validator.Struct(i); err != nil {
+		// Если есть ошибки валидации, создаем HTTP ошибку с кодом 400 и сообщением об ошибке
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	return nil
