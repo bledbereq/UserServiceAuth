@@ -1,0 +1,9 @@
+env: "dev" 
+
+storage_path: "./storage/sso.db" 
+
+http_server:
+  adress: "localhost:8082"
+  timeout: 4s
+  iddle_timeout: 60s
+  
