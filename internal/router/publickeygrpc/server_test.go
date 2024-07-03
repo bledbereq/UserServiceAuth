@@ -34,8 +34,6 @@ func startTestGRPCServer(t *testing.T, port int) (*grpc.Server, net.Listener, ch
 		close(done)
 	}()
 
-	time.Sleep(500 * time.Millisecond)
-
 	return server, lis, done
 }
 
