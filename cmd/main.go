@@ -2,11 +2,13 @@ package main
 
 import (
 	"UserServiceAuth/internal/config"
-	auth "UserServiceAuth/internal/router"
+	auth "UserServiceAuth/internal/router/auth"
+	router "UserServiceAuth/internal/router/publickeygrpc"
 	"context"
 	"flag"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -15,6 +17,7 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -29,9 +32,39 @@ func main() {
 	}
 
 	cfg := config.MustLoadByPath(configPath)
-
 	fmt.Println(cfg)
+
 	log := setupLogger(cfg.Env)
+	log.Info("старт приложения",
+		slog.String("env", cfg.Env),
+		slog.Any("cfg", cfg),
+		slog.Int("port", cfg.GRPC.Port))
+
+	// Создание gRPC сервера
+	grpcServer := grpc.NewServer()
+	routerGrpc := router.NewGrpcApi(grpcServer)
+	_ = routerGrpc
+
+	// Используем WaitGroup для ожидания завершения горутин
+	var wg sync.WaitGroup
+
+	// Запуск gRPC сервера в отдельной горутине
+	wg.Add(1)
+	go func(grpcServer *grpc.Server) {
+		defer wg.Done()
+		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.GRPC.Port))
+		if err != nil {
+			log.Error("ошибка при запуске gRPC сервера", "error", err)
+			return
+		}
+		defer lis.Close()
+
+		log.Info("gRPC сервер запущен", slog.String("addr", lis.Addr().String()))
+
+		if err := grpcServer.Serve(lis); err != nil {
+			log.Error("ошибка при запуске gRPC сервера", "error", err)
+		}
+	}(grpcServer)
 
 	// Создание сервера Echo
 	e := echo.New()
@@ -40,17 +73,12 @@ func main() {
 	httpRouter := auth.NewHttpRouter(e)
 	_ = httpRouter
 
-	// Используем WaitGroup для ожидания завершения горутин
-	var wg sync.WaitGroup
-
-	// Добавление одной горутины в WaitGroup
-	wg.Add(1)
-
 	// Запуск сервера Echo в отдельной горутине
+	wg.Add(1)
 	go func() {
 		defer wg.Done()
 
-		if err := e.Start(cfg.HttpServer.Adress); err != nil && err != http.ErrServerClosed {
+		if err := e.Start(cfg.HTTP.Address); err != nil && err != http.ErrServerClosed {
 			log.Error("failed to start HTTP server", "error", err)
 		}
 	}()
@@ -60,14 +88,14 @@ func main() {
 	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
 	<-stop
 
+	grpcServer.GracefulStop()
+	log.Info("gRPC сервер успешно остановлен")
+
 	log.Info("Shutting down server...")
 
 	// Создание контекста с таймаутом для плавной остановки сервера
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-
-	// Ожидание завершения всех горутин
-	wg.Wait()
 
 	// Остановка сервера Echo
 	if err := e.Shutdown(ctx); err != nil {
@@ -75,24 +103,24 @@ func main() {
 	} else {
 		log.Info("Server gracefully stopped")
 	}
-	wg.Done()
 
+	// Ожидание завершения всех горутин
+	wg.Wait()
 }
-
-const (
-	envDev  = "dev"
-	envProd = "prod"
-)
 
 func setupLogger(env string) *slog.Logger {
 	var log *slog.Logger
 
 	switch env {
-	case envDev:
+	case "dev":
 		log = slog.New(
 			slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}),
 		)
-	case envProd:
+	case "prod":
+		log = slog.New(
+			slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}),
+		)
+	default:
 		log = slog.New(
 			slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}),
 		)

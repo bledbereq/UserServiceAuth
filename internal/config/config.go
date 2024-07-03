@@ -10,13 +10,19 @@ import (
 type Config struct {
 	Env         string           `yaml:"env" env-default:"local"`
 	StoragePath string           `yaml:"storage_path" env-required:"true"`
-	HttpServer  HttpServerConfig `yaml:"http_server" env-required:"true"`
+	GRPC        GRPCconfig       `yaml:"grpc" env-required:"true"`
+	HTTP        HttpServerConfig `yaml:"http_server" env-required:"true"`
+}
+
+type GRPCconfig struct {
+	Port    int           `yaml:"port"`
+	Timeout time.Duration `yaml:"timeout"`
 }
 
 type HttpServerConfig struct {
-	Adress        string        `yaml:"adress" env-default:"localhost:8080"`
-	Timeout       time.Duration `yaml:"timeout" env-default:"4s"`
-	Iddle_timeout time.Duration `yaml:"iddle_timeout" env-default:"60s"`
+	Address     string        `yaml:"adress" env-default:"localhost:8080"`
+	Timeout     time.Duration `yaml:"timeout" env-default:"4s"`
+	IdleTimeout time.Duration `yaml:"idle_timeout" env-default:"60s"`
 }
 
 func MustLoadByPath(configPath string) *Config {
