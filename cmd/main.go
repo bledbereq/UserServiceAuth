@@ -36,7 +36,8 @@ func main() {
 
 	// Создание gRPC сервера
 	grpcServer := grpc.NewServer()
-	router.RegisterGrpcRouter(grpcServer)
+	routerGrpc := router.NewGrpcApi(grpcServer)
+	_ = routerGrpc
 
 	// Запуск gRPC сервера в отдельной горутине
 	go func() {

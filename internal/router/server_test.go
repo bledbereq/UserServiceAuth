@@ -18,7 +18,7 @@ import (
 // startTestGRPCServer запускает тестовый gRPC сервер
 func startTestGRPCServer(t *testing.T, port int) (*grpc.Server, net.Listener, chan struct{}) {
 	server := grpc.NewServer()
-	publickeygrpc.RegisterGrpcRouter(server)
+	publickeygrpc.NewGrpcApi(server)
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
