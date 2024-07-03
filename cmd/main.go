@@ -1,7 +1,7 @@
 package main
 
 import (
-	"UserServiceAuth/internal/app"
+	app "UserServiceAuth/internal/app"
 	"UserServiceAuth/internal/config"
 	"flag"
 	"fmt"
@@ -32,15 +32,14 @@ func main() {
 		slog.Int("port", cfg.GRPC.Port))
 
 	// Запуск gRPC сервера
-	application := app.New(log, cfg.GRPC.Port, cfg.StoragePath, cfg.TokenTTL)
-	go application.GRPCSrv.Run()
+	application := app.New(log, cfg.GRPC.Port)
+	go application.Run()
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
 
 	<-stop
 
-	application.GRPCSrv.Stop()
-
+	application.Stop()
 	log.Info("Gracefully stopped")
 }
 

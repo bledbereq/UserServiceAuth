@@ -12,13 +12,13 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	ssov1 "UserServiceAuth/gen/go"
-	publickeygrpc "UserServiceAuth/internal/grpc/publickey"
+	publickeygrpc "UserServiceAuth/internal/router"
 )
 
 // startTestGRPCServer запускает тестовый gRPC сервер
 func startTestGRPCServer(t *testing.T, port int) (*grpc.Server, net.Listener, chan struct{}) {
 	server := grpc.NewServer()
-	publickeygrpc.Register(server)
+	publickeygrpc.RegisterRouter(server)
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
@@ -34,7 +34,6 @@ func startTestGRPCServer(t *testing.T, port int) (*grpc.Server, net.Listener, ch
 		close(done)
 	}()
 
-	// Подождите немного, чтобы сервер точно успел запуститься
 	time.Sleep(500 * time.Millisecond)
 
 	return server, lis, done
