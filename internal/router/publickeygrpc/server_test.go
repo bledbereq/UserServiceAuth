@@ -12,7 +12,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	ssov1 "UserServiceAuth/gen/go"
-	publickeygrpc "UserServiceAuth/internal/router"
+	"UserServiceAuth/internal/router/publickeygrpc"
 )
 
 // startTestGRPCServer запускает тестовый gRPC сервер

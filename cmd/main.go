@@ -2,26 +2,32 @@ package main
 
 import (
 	"UserServiceAuth/internal/config"
-	router "UserServiceAuth/internal/router"
+	auth "UserServiceAuth/internal/router/auth"
+	router "UserServiceAuth/internal/router/publickeygrpc"
+	"context"
 	"flag"
 	"fmt"
 	"log/slog"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
+	"time"
 
+	"github.com/labstack/echo/v4"
 	"google.golang.org/grpc"
 )
 
 func main() {
 	var configPath string
-	flag.StringVar(&configPath, "config", "", "путь к файлу конфигурации")
+	flag.StringVar(&configPath, "config", "", "path to config file")
 	flag.Parse()
 
-	// Проверка аргумента "config"
+	// Валидация аргумента "config"
 	if configPath == "" {
-		fmt.Println("Использование: ./вашприложение -config <путь_к_файлу_конфигурации>")
+		fmt.Println("Usage: ./yourapp -config <path_to_config_file>")
 		os.Exit(1)
 	}
 
@@ -39,8 +45,13 @@ func main() {
 	routerGrpc := router.NewGrpcApi(grpcServer)
 	_ = routerGrpc
 
+	// Используем WaitGroup для ожидания завершения горутин
+	var wg sync.WaitGroup
+
 	// Запуск gRPC сервера в отдельной горутине
-	go func() {
+	wg.Add(1)
+	go func(grpcServer *grpc.Server) {
+		defer wg.Done()
 		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.GRPC.Port))
 		if err != nil {
 			log.Error("ошибка при запуске gRPC сервера", "error", err)
@@ -53,6 +64,23 @@ func main() {
 		if err := grpcServer.Serve(lis); err != nil {
 			log.Error("ошибка при запуске gRPC сервера", "error", err)
 		}
+	}(grpcServer)
+
+	// Создание сервера Echo
+	e := echo.New()
+
+	// Создание роутера
+	httpRouter := auth.NewHttpRouter(e)
+	_ = httpRouter
+
+	// Запуск сервера Echo в отдельной горутине
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		if err := e.Start(cfg.HTTP.Address); err != nil && err != http.ErrServerClosed {
+			log.Error("failed to start HTTP server", "error", err)
+		}
 	}()
 
 	// Ожидание сигнала для остановки сервера
@@ -61,7 +89,23 @@ func main() {
 	<-stop
 
 	grpcServer.GracefulStop()
-	log.Info("приложение успешно остановлено")
+	log.Info("gRPC сервер успешно остановлен")
+
+	log.Info("Shutting down server...")
+
+	// Создание контекста с таймаутом для плавной остановки сервера
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Остановка сервера Echo
+	if err := e.Shutdown(ctx); err != nil {
+		log.Error("failed to gracefully shutdown the server", "error", err)
+	} else {
+		log.Info("Server gracefully stopped")
+	}
+
+	// Ожидание завершения всех горутин
+	wg.Wait()
 }
 
 func setupLogger(env string) *slog.Logger {
