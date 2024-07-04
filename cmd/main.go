@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 	"time"
 
@@ -45,26 +44,21 @@ func main() {
 	routerGrpc := router.NewGrpcApi(grpcServer)
 	_ = routerGrpc
 
-	// Используем WaitGroup для ожидания завершения горутин
-	var wg sync.WaitGroup
+	// Запуск gRPC сервера
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.GRPC.Port))
+	if err != nil {
+		log.Error("ошибка при запуске gRPC сервера", "error", err)
+		return
+	}
+	defer lis.Close()
 
-	// Запуск gRPC сервера в отдельной горутине
-	wg.Add(1)
-	go func(grpcServer *grpc.Server) {
-		defer wg.Done()
-		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.GRPC.Port))
-		if err != nil {
-			log.Error("ошибка при запуске gRPC сервера", "error", err)
-			return
-		}
-		defer lis.Close()
+	log.Info("gRPC сервер запущен", slog.String("addr", lis.Addr().String()))
 
-		log.Info("gRPC сервер запущен", slog.String("addr", lis.Addr().String()))
-
+	go func() {
 		if err := grpcServer.Serve(lis); err != nil {
 			log.Error("ошибка при запуске gRPC сервера", "error", err)
 		}
-	}(grpcServer)
+	}()
 
 	// Создание сервера Echo
 	e := echo.New()
@@ -73,17 +67,14 @@ func main() {
 	httpRouter := auth.NewHttpRouter(e)
 	_ = httpRouter
 
-	// Запуск сервера Echo в отдельной горутине
-	wg.Add(1)
+	// Запуск сервера Echo
 	go func() {
-		defer wg.Done()
-
 		if err := e.Start(cfg.HTTP.Address); err != nil && err != http.ErrServerClosed {
-			log.Error("failed to start HTTP server", "error", err)
+			log.Error("ошибка при запуске HTTP сервера", "error", err)
 		}
 	}()
 
-	// Ожидание сигнала для остановки сервера
+	// Ожидание сигнала для остановки серверов
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
 	<-stop
@@ -99,13 +90,10 @@ func main() {
 
 	// Остановка сервера Echo
 	if err := e.Shutdown(ctx); err != nil {
-		log.Error("failed to gracefully shutdown the server", "error", err)
+		log.Error("ошибка при остановке HTTP сервера", "error", err)
 	} else {
-		log.Info("Server gracefully stopped")
+		log.Info("HTTP сервер успешно остановлен")
 	}
-
-	// Ожидание завершения всех горутин
-	wg.Wait()
 }
 
 func setupLogger(env string) *slog.Logger {
