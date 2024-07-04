@@ -31,13 +31,10 @@ func main() {
 	}
 
 	cfg := config.MustLoadByPath(configPath)
-	fmt.Println(cfg)
-
 	log := setupLogger(cfg.Env)
 	log.Info("старт приложения",
 		slog.String("env", cfg.Env),
-		slog.Any("cfg", cfg),
-		slog.Int("port", cfg.GRPC.Port))
+		slog.Any("cfg", cfg))
 
 	// Создание gRPC сервера
 	grpcServer := grpc.NewServer()
@@ -94,6 +91,7 @@ func main() {
 	} else {
 		log.Info("HTTP сервер успешно остановлен")
 	}
+
 }
 
 func setupLogger(env string) *slog.Logger {

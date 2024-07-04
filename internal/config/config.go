@@ -8,10 +8,10 @@ import (
 )
 
 type Config struct {
-	Env         string           `yaml:"env" env-default:"local"`
-	StoragePath string           `yaml:"storage_path" env-required:"true"`
-	GRPC        GRPCconfig       `yaml:"grpc" env-required:"true"`
-	HTTP        HttpServerConfig `yaml:"http_server" env-required:"true"`
+	Env  string           `yaml:"env" env-default:"local"`
+	GRPC GRPCconfig       `yaml:"grpc" env-required:"true"`
+	HTTP HttpServerConfig `yaml:"http_server" env-required:"true"`
+	DB   DBauthConfig     `yaml:"db"`
 }
 
 type GRPCconfig struct {
@@ -20,9 +20,17 @@ type GRPCconfig struct {
 }
 
 type HttpServerConfig struct {
-	Address     string        `yaml:"adress" env-default:"localhost:8080"`
+	Address     string        `yaml:"address" env-default:"localhost:8080"`
 	Timeout     time.Duration `yaml:"timeout" env-default:"4s"`
 	IdleTimeout time.Duration `yaml:"idle_timeout" env-default:"60s"`
+}
+
+type DBauthConfig struct {
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
+	DBName   string `yaml:"dbname"`
 }
 
 func MustLoadByPath(configPath string) *Config {
