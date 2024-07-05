@@ -5,6 +5,7 @@ import (
 	auth "UserServiceAuth/internal/router/auth"
 	router "UserServiceAuth/internal/router/publickeygrpc"
 	"UserServiceAuth/internal/router/repositories"
+	services "UserServiceAuth/internal/uscase"
 	"UserServiceAuth/storage"
 	"context"
 	"flag"
@@ -18,6 +19,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
 	"google.golang.org/grpc"
 )
@@ -67,9 +69,18 @@ func main() {
 	// Создание сервера Echo
 	e := echo.New()
 
-	// Создание роутера
-	httpRouter := auth.NewHttpRouter(e)
-	_ = httpRouter
+	db := storage.InitDB(cfg)
+	userRepo := repositories.NewUserRepository(db)
+
+	// Создание сервиса
+	userService := services.NewUserService(userRepo)
+
+	// Создание валидатора
+	validator := validator.New()
+
+	// Создание и настройка HTTP роутера
+	authRouter := auth.NewHttpRouter(e, userService, validator)
+	_ = authRouter
 
 	// Запуск сервера Echo
 	wg.Add(1)
@@ -79,9 +90,6 @@ func main() {
 			log.Error("ошибка при запуске HTTP сервера", "error", err)
 		}
 	}()
-	db := storage.InitDB(cfg)
-	userRepository := repositories.NewUserRepository(db)
-	_ = userRepository
 
 	// Ожидание сигнала для остановки серверов
 	stop := make(chan os.Signal, 1)

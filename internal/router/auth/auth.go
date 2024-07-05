@@ -3,26 +3,33 @@ package auth
 import (
 	"net/http"
 
+	models "UserServiceAuth/storage"
+
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
 )
 
-// HttpRouter представляет маршрутизатор HTTP с зависимостями и сервисами
-type HttpRouter struct {
-	validator *validator.Validate
+// IHandlerUsecase определяет интерфейс для использования в HTTP роутере
+type IHandlerUsecase interface {
+	RegisterUser(user *models.USERS) error
+	AuthenticateUser(login, password string) (*models.USERS, error)
 }
 
-// NewHttpRouter создает новый HttpRouter и настраивает маршруты
-func NewHttpRouter(e *echo.Echo) *HttpRouter {
-	// Создание экземпляра валидатора
-	validator := validator.New()
+// HttpRouter представляет HTTP маршрутизатор
+type HttpRouter struct {
+	validator *validator.Validate
+	usecase   IHandlerUsecase
+}
 
+// NewHttpRouter создает новый HttpRouter
+func NewHttpRouter(e *echo.Echo, usecase IHandlerUsecase, validator *validator.Validate) *HttpRouter {
 	// Установка валидатора в Echo
 	e.Validator = &CustomValidator{validator}
 
 	// Инициализация роутера
 	router := &HttpRouter{
 		validator: validator,
+		usecase:   usecase,
 	}
 
 	// Настройка маршрутов
@@ -32,12 +39,12 @@ func NewHttpRouter(e *echo.Echo) *HttpRouter {
 	return router
 }
 
-// CustomValidator представляет специальный валидатор для Echo, который использует go-playground/validator
+// CustomValidator представляет специальный валидатор для Echo
 type CustomValidator struct {
 	validator *validator.Validate
 }
 
-// Validate валидирует структуру i с помощью внешнего валидатора и возвращает HTTP-ошибку, если валидация не прошла
+// Validate валидирует структуру
 func (cv *CustomValidator) Validate(i interface{}) error {
 	if err := cv.validator.Struct(i); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, map[string]interface{}{
@@ -55,23 +62,25 @@ func (h *HttpRouter) handleLogin(ctx echo.Context) error {
 		Password string `json:"password" validate:"required"`
 	}
 
-	req := &LoginRequest{}
+	req := new(LoginRequest)
 	if err := ctx.Bind(req); err != nil {
-		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": "Неверный формат запроса"})
+		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request format"})
 	}
 
-	// Проверка валидности полей запроса
 	if err := h.validator.Struct(req); err != nil {
 		return ctx.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error":   "Ошибка валидации",
+			"error":   "Validation error",
 			"details": err.Error(),
 		})
 	}
 
-	// Логика обработки логина с использованием юзкейсов
-	// ...
+	user, err := h.usecase.AuthenticateUser(req.Login, req.Password)
+	if err != nil {
+		return ctx.JSON(http.StatusUnauthorized, map[string]string{"error": err.Error()})
+	}
+	_ = user
 
-	return ctx.JSON(http.StatusCreated, "1jwt1")
+	return ctx.JSON(http.StatusOK, map[string]string{"message": "User authenticated successfully", "user": "jwt"})
 }
 
 // handleRegister обрабатывает запросы на /register
@@ -84,21 +93,29 @@ func (h *HttpRouter) handleRegister(ctx echo.Context) error {
 		Password string `json:"password" validate:"required"`
 	}
 
-	req := &RegisterRequest{}
+	req := new(RegisterRequest)
 	if err := ctx.Bind(req); err != nil {
-		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": "Неверный формат запроса"})
+		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request format"})
 	}
 
-	// Проверка валидности полей запроса
 	if err := h.validator.Struct(req); err != nil {
 		return ctx.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error":   "Ошибка валидации",
+			"error":   "Validation error",
 			"details": err.Error(),
 		})
 	}
 
-	// Логика обработки регистрации с использованием юзкейсов
-	// ...
+	user := &models.USERS{
+		USERNAME: req.Username,
+		SURNAME:  req.Surname,
+		EMAIL:    req.Email,
+		LOGIN:    req.Login,
+		PASSWORD: req.Password,
+	}
 
-	return ctx.JSON(http.StatusCreated, "1jwt1")
+	if err := h.usecase.RegisterUser(user); err != nil {
+		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
+
+	return ctx.JSON(http.StatusCreated, "User registered successfully")
 }
