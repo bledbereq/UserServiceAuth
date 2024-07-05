@@ -14,7 +14,7 @@ services:
       - ps
 
   db_auth:
-    image: postgres:17beta2-alpine3.20
+    image: postgres:16.3-alpine3.20
     container_name: db_auth
     ports:
       - "5432:5432"
