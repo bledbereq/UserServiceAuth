@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -39,6 +40,8 @@ func main() {
 		slog.Any("cfg", cfg),
 		slog.Int("port", cfg.GRPC.Port))
 
+	var wg sync.WaitGroup
+
 	// Создание gRPC сервера
 	grpcServer := grpc.NewServer()
 	routerGrpc := router.NewGrpcApi(grpcServer)
@@ -54,7 +57,9 @@ func main() {
 
 	log.Info("gRPC сервер запущен", slog.String("addr", lis.Addr().String()))
 
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		if err := grpcServer.Serve(lis); err != nil {
 			log.Error("ошибка при запуске gRPC сервера", "error", err)
 		}
@@ -68,7 +73,9 @@ func main() {
 	_ = httpRouter
 
 	// Запуск сервера Echo
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		if err := e.Start(cfg.HTTP.Address); err != nil && err != http.ErrServerClosed {
 			log.Error("ошибка при запуске HTTP сервера", "error", err)
 		}
@@ -79,21 +86,26 @@ func main() {
 	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
 	<-stop
 
+	log.Info("Получен сигнал на остановку серверов")
+
+	// Остановка gRPC сервера
 	grpcServer.GracefulStop()
 	log.Info("gRPC сервер успешно остановлен")
 
-	log.Info("Shutting down server...")
-
-	// Создание контекста с таймаутом для плавной остановки сервера
+	// Создание контекста с таймаутом для плавной остановки HTTP сервера
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Остановка сервера Echo
+	// Остановка HTTP сервера
 	if err := e.Shutdown(ctx); err != nil {
 		log.Error("ошибка при остановке HTTP сервера", "error", err)
 	} else {
 		log.Info("HTTP сервер успешно остановлен")
 	}
+
+	// Ожидание завершения всех горутин
+	wg.Wait()
+	log.Info("Сервера успешно остановлены")
 }
 
 func setupLogger(env string) *slog.Logger {
