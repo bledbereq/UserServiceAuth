@@ -4,6 +4,8 @@ import (
 	"UserServiceAuth/internal/config"
 	auth "UserServiceAuth/internal/router/auth"
 	router "UserServiceAuth/internal/router/publickeygrpc"
+	"UserServiceAuth/internal/router/repositories"
+	"UserServiceAuth/storage"
 	"context"
 	"flag"
 	"fmt"
@@ -70,6 +72,9 @@ func main() {
 			log.Error("ошибка при запуске HTTP сервера", "error", err)
 		}
 	}()
+	db := storage.InitDB(cfg)
+	userRepository := repositories.NewUserRepository(db)
+	_ = userRepository
 
 	// Ожидание сигнала для остановки серверов
 	stop := make(chan os.Signal, 1)
