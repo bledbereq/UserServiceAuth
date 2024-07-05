@@ -2,6 +2,7 @@ package auth
 
 import (
 	"net/http"
+	"strconv"
 
 	models "UserServiceAuth/storage"
 
@@ -9,42 +10,37 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// IHandlerUsecase определяет интерфейс для использования в HTTP роутере
 type IHandlerUsecase interface {
 	RegisterUser(user *models.USERS) error
 	AuthenticateUser(login, password string) (*models.USERS, error)
+	UpdateUserByID(id uint, user *models.USERS) error
 }
 
-// HttpRouter представляет HTTP маршрутизатор
 type HttpRouter struct {
 	validator *validator.Validate
 	usecase   IHandlerUsecase
 }
 
-// NewHttpRouter создает новый HttpRouter
 func NewHttpRouter(e *echo.Echo, usecase IHandlerUsecase, validator *validator.Validate) *HttpRouter {
-	// Установка валидатора в Echo
+
 	e.Validator = &CustomValidator{validator}
 
-	// Инициализация роутера
 	router := &HttpRouter{
 		validator: validator,
 		usecase:   usecase,
 	}
 
-	// Настройка маршрутов
 	e.POST("/login", router.handleLogin)
 	e.POST("/register", router.handleRegister)
+	e.PUT("/update/:id", router.handleUpdateUserByID)
 
 	return router
 }
 
-// CustomValidator представляет специальный валидатор для Echo
 type CustomValidator struct {
 	validator *validator.Validate
 }
 
-// Validate валидирует структуру
 func (cv *CustomValidator) Validate(i interface{}) error {
 	if err := cv.validator.Struct(i); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, map[string]interface{}{
@@ -55,7 +51,6 @@ func (cv *CustomValidator) Validate(i interface{}) error {
 	return nil
 }
 
-// handleLogin обрабатывает запросы на /login
 func (h *HttpRouter) handleLogin(ctx echo.Context) error {
 	type LoginRequest struct {
 		Login    string `json:"login" validate:"required"`
@@ -83,7 +78,6 @@ func (h *HttpRouter) handleLogin(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, map[string]string{"message": "User authenticated successfully", "user": "jwt"})
 }
 
-// handleRegister обрабатывает запросы на /register
 func (h *HttpRouter) handleRegister(ctx echo.Context) error {
 	type RegisterRequest struct {
 		Username string `json:"username" validate:"required"`
@@ -118,4 +112,48 @@ func (h *HttpRouter) handleRegister(ctx echo.Context) error {
 	}
 
 	return ctx.JSON(http.StatusCreated, "User registered successfully")
+}
+
+func (h *HttpRouter) handleUpdateUserByID(ctx echo.Context) error {
+	type UpdateRequest struct {
+		Login    string `json:"login" validate:"required"`
+		Username string `json:"username" validate:"required"`
+		Surname  string `json:"surname" validate:"required"`
+		Email    string `json:"email" validate:"required,email"`
+		Password string `json:"password" validate:"required"`
+	}
+
+	req := new(UpdateRequest)
+	if err := ctx.Bind(req); err != nil {
+		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request format"})
+	}
+
+	if err := h.validator.Struct(req); err != nil {
+		return ctx.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error":   "Validation error",
+			"details": err.Error(),
+		})
+	}
+
+	id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
+	if err != nil {
+		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
+	}
+
+	updatedUser := &models.USERS{
+		LOGIN:    req.Login,
+		USERNAME: req.Username,
+		SURNAME:  req.Surname,
+		EMAIL:    req.Email,
+		PASSWORD: req.Password,
+	}
+
+	if err := h.usecase.UpdateUserByID(uint(id), updatedUser); err != nil {
+		if err.Error() == "user with this id not exists" {
+			return ctx.JSON(http.StatusNotFound, map[string]string{"error": err.Error()})
+		}
+		return ctx.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+
+	return ctx.JSON(http.StatusOK, "User updated successfully")
 }

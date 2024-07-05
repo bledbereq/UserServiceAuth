@@ -30,6 +30,11 @@ func (m *MockHandlerUsecase) AuthenticateUser(login, password string) (*storage.
 	return args.Get(0).(*storage.USERS), args.Error(1)
 }
 
+func (m *MockHandlerUsecase) UpdateUserByID(id uint, user *storage.USERS) error {
+	args := m.Called(id, user)
+	return args.Error(0)
+}
+
 func TestHandleLogin_ValidRequest(t *testing.T) {
 	assert := assert.New(t)
 	e := echo.New()
@@ -159,21 +164,17 @@ func TestHandleRegister_DuplicateEmail(t *testing.T) {
 	rec := httptest.NewRecorder()
 	ctx := e.NewContext(req, rec)
 
-	// Устанавливаем мок для возврата ошибки DuplicateEmail при регистрации пользователя
 	mockUsecase := router.usecase.(*MockHandlerUsecase)
 	mockUsecase.On("RegisterUser", mock.Anything).Return(errors.New("DuplicateEmail"))
 
-	// Вызываем обработчик
 	err := router.handleRegister(ctx)
 	assert.NoError(err)
 
 	assert.Equal(http.StatusBadRequest, rec.Code)
 
-	// Проверяем ожидаемый JSON-ответ с ошибкой дубликата email
 	expectedResponse := `{"error":"DuplicateEmail"}`
 	assert.JSONEq(expectedResponse, rec.Body.String())
 
-	// Проверяем вызовы к моку
 	mockUsecase.AssertExpectations(t)
 }
 
@@ -188,20 +189,90 @@ func TestHandleRegister_DuplicateLogin(t *testing.T) {
 	rec := httptest.NewRecorder()
 	ctx := e.NewContext(req, rec)
 
-	// Устанавливаем мок для возврата ошибки DuplicateLogin при регистрации пользователя
 	mockUsecase := router.usecase.(*MockHandlerUsecase)
 	mockUsecase.On("RegisterUser", mock.Anything).Return(errors.New("DuplicateLogin"))
 
-	// Вызываем обработчик
 	err := router.handleRegister(ctx)
 	assert.NoError(err)
 
 	assert.Equal(http.StatusBadRequest, rec.Code)
 
-	// Проверяем ожидаемый JSON-ответ с ошибкой дубликата логина
 	expectedResponse := `{"error":"DuplicateLogin"}`
 	assert.JSONEq(expectedResponse, rec.Body.String())
 
-	// Проверяем вызовы к моку
 	mockUsecase.AssertExpectations(t)
+}
+
+func TestHandleUpdateUserByID_ValidRequest(t *testing.T) {
+	assert := assert.New(t)
+	e := echo.New()
+	mockUsecase := new(MockHandlerUsecase)
+	router := NewHttpRouter(e, mockUsecase, validator.New())
+
+	reqBody := `{"login": "newlogin", "username": "John", "surname": "Doe", "email": "john.doe@example.com", "password": "newPwd123"}`
+	req := httptest.NewRequest(http.MethodPut, "/update/1", strings.NewReader(reqBody))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	ctx := e.NewContext(req, rec)
+	ctx.SetParamNames("id")
+	ctx.SetParamValues("1")
+
+	mockUsecase.On("UpdateUserByID", uint(1), mock.Anything).Return(nil)
+
+	err := router.handleUpdateUserByID(ctx)
+
+	assert.NoError(err)
+	assert.Equal(http.StatusOK, rec.Code)
+
+	expectedResponse := `"User updated successfully"`
+	assert.JSONEq(expectedResponse, rec.Body.String())
+
+	mockUsecase.AssertExpectations(t)
+}
+
+func TestHandleUpdateUserByID_UserNotFound(t *testing.T) {
+	assert := assert.New(t)
+	e := echo.New()
+	mockUsecase := new(MockHandlerUsecase)
+	router := NewHttpRouter(e, mockUsecase, validator.New())
+
+	reqBody := `{"login": "newlogin", "username": "John", "surname": "Doe", "email": "john.doe@example.com", "password": "newPwd123"}`
+	req := httptest.NewRequest(http.MethodPut, "/update/999", strings.NewReader(reqBody))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	ctx := e.NewContext(req, rec)
+	ctx.SetParamNames("id")
+	ctx.SetParamValues("999")
+
+	mockUsecase.On("UpdateUserByID", uint(999), mock.Anything).Return(errors.New("user with this id not exists"))
+
+	err := router.handleUpdateUserByID(ctx)
+
+	assert.NoError(err)
+	assert.Equal(http.StatusNotFound, rec.Code)
+
+	expectedResponse := `{"error":"user with this id not exists"}`
+	assert.JSONEq(expectedResponse, rec.Body.String())
+
+	mockUsecase.AssertExpectations(t)
+}
+func TestHandleUpdateUserByID_InvalidRequest(t *testing.T) {
+	assert := assert.New(t)
+	e := echo.New()
+	router := NewHttpRouter(e, &MockHandlerUsecase{}, validator.New())
+
+	reqBody := `{"login": "updated_login", "username": "Updated", "surname": "User", "email": "updated@example.com", "password": "updatedPassword"}`
+	req := httptest.NewRequest(http.MethodPut, "/update/invalid_id", strings.NewReader(reqBody))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	ctx := e.NewContext(req, rec)
+
+	err := router.handleUpdateUserByID(ctx)
+
+	assert.Equal(http.StatusBadRequest, rec.Code)
+
+	expectedResponse := `{"error":"Invalid user ID"}`
+	assert.JSONEq(expectedResponse, rec.Body.String())
+
+	assert.NoError(err)
 }
