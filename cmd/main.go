@@ -40,31 +40,30 @@ func main() {
 		slog.Any("cfg", cfg),
 		slog.Int("port", cfg.GRPC.Port))
 
+	var wg sync.WaitGroup
+
 	// Создание gRPC сервера
 	grpcServer := grpc.NewServer()
 	routerGrpc := router.NewGrpcApi(grpcServer)
 	_ = routerGrpc
 
-	// Используем WaitGroup для ожидания завершения горутин
-	var wg sync.WaitGroup
+	// Запуск gRPC сервера
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.GRPC.Port))
+	if err != nil {
+		log.Error("ошибка при запуске gRPC сервера", "error", err)
+		return
+	}
+	defer lis.Close()
 
-	// Запуск gRPC сервера в отдельной горутине
+	log.Info("gRPC сервер запущен", slog.String("addr", lis.Addr().String()))
+
 	wg.Add(1)
-	go func(grpcServer *grpc.Server) {
+	go func() {
 		defer wg.Done()
-		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.GRPC.Port))
-		if err != nil {
-			log.Error("ошибка при запуске gRPC сервера", "error", err)
-			return
-		}
-		defer lis.Close()
-
-		log.Info("gRPC сервер запущен", slog.String("addr", lis.Addr().String()))
-
 		if err := grpcServer.Serve(lis); err != nil {
 			log.Error("ошибка при запуске gRPC сервера", "error", err)
 		}
-	}(grpcServer)
+	}()
 
 	// Создание сервера Echo
 	e := echo.New()
@@ -73,39 +72,40 @@ func main() {
 	httpRouter := auth.NewHttpRouter(e)
 	_ = httpRouter
 
-	// Запуск сервера Echo в отдельной горутине
+	// Запуск сервера Echo
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-
 		if err := e.Start(cfg.HTTP.Address); err != nil && err != http.ErrServerClosed {
-			log.Error("failed to start HTTP server", "error", err)
+			log.Error("ошибка при запуске HTTP сервера", "error", err)
 		}
 	}()
 
-	// Ожидание сигнала для остановки сервера
+	// Ожидание сигнала для остановки серверов
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
 	<-stop
 
+	log.Info("Получен сигнал на остановку серверов")
+
+	// Остановка gRPC сервера
 	grpcServer.GracefulStop()
 	log.Info("gRPC сервер успешно остановлен")
 
-	log.Info("Shutting down server...")
-
-	// Создание контекста с таймаутом для плавной остановки сервера
+	// Создание контекста с таймаутом для плавной остановки HTTP сервера
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Остановка сервера Echo
+	// Остановка HTTP сервера
 	if err := e.Shutdown(ctx); err != nil {
-		log.Error("failed to gracefully shutdown the server", "error", err)
+		log.Error("ошибка при остановке HTTP сервера", "error", err)
 	} else {
-		log.Info("Server gracefully stopped")
+		log.Info("HTTP сервер успешно остановлен")
 	}
 
 	// Ожидание завершения всех горутин
 	wg.Wait()
+	log.Info("Сервера успешно остановлены")
 }
 
 func setupLogger(env string) *slog.Logger {

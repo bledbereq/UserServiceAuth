@@ -1,0 +1,41 @@
+version: '3.5'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8082:8082"  
+      - "44044:44044" 
+    depends_on:
+      - db_auth  
+    environment:
+      - CONFIG_PATH=/path/to/config.yaml
+    networks:
+      - ps
+
+  db_auth:
+    image: postgres:16.3-alpine3.20
+    container_name: db_auth
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_PASSWORD=root
+      - POSTGRES_USER=admin
+    networks:
+      - ps
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@admin.com
+      - PGADMIN_DEFAULT_PASSWORD=admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - db_auth
+    networks:
+      - ps
+
+networks:
+  ps:
