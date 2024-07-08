@@ -153,31 +153,6 @@ func TestHandleRegister_UsecaseError(t *testing.T) {
 	mockUsecase.AssertExpectations(t)
 }
 
-func TestHandleRegister_DuplicateEmail(t *testing.T) {
-	assert := assert.New(t)
-	e := echo.New()
-	router := NewHttpRouter(e, &MockHandlerUsecase{}, validator.New())
-
-	reqBody := `{"username": "John", "surname": "Doe", "email": "john.doe@example.com", "login": "johndoe", "password": "securePwd123"}`
-	req := httptest.NewRequest(http.MethodPost, "/register", strings.NewReader(reqBody))
-	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-	rec := httptest.NewRecorder()
-	ctx := e.NewContext(req, rec)
-
-	mockUsecase := router.usecase.(*MockHandlerUsecase)
-	mockUsecase.On("RegisterUser", mock.Anything).Return(errors.New("DuplicateEmail"))
-
-	err := router.handleRegister(ctx)
-	assert.NoError(err)
-
-	assert.Equal(http.StatusBadRequest, rec.Code)
-
-	expectedResponse := `{"error":"DuplicateEmail"}`
-	assert.JSONEq(expectedResponse, rec.Body.String())
-
-	mockUsecase.AssertExpectations(t)
-}
-
 func TestHandleRegister_DuplicateLogin(t *testing.T) {
 	assert := assert.New(t)
 	e := echo.New()

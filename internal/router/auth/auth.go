@@ -4,16 +4,16 @@ import (
 	"net/http"
 	"strconv"
 
-	models "UserServiceAuth/storage"
+	dto "UserServiceAuth/storage"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
 )
 
 type IHandlerUsecase interface {
-	RegisterUser(user *models.USERS) error
-	AuthenticateUser(login, password string) (*models.USERS, error)
-	UpdateUserByID(id uint, user *models.USERS) error
+	RegisterUser(user *dto.USERS) error
+	AuthenticateUser(login, password string) (*dto.USERS, error)
+	UpdateUserByID(id uint, user *dto.USERS) error
 }
 
 type HttpRouter struct {
@@ -99,7 +99,7 @@ func (h *HttpRouter) handleRegister(ctx echo.Context) error {
 		})
 	}
 
-	user := &models.USERS{
+	user := &dto.USERS{
 		USERNAME: req.Username,
 		SURNAME:  req.Surname,
 		EMAIL:    req.Email,
@@ -140,7 +140,7 @@ func (h *HttpRouter) handleUpdateUserByID(ctx echo.Context) error {
 		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
 	}
 
-	updatedUser := &models.USERS{
+	updatedUser := &dto.USERS{
 		LOGIN:    req.Login,
 		USERNAME: req.Username,
 		SURNAME:  req.Surname,

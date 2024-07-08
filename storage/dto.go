@@ -10,7 +10,7 @@ type TOKENS struct {
 }
 
 type USERS struct {
-	USERID   uint   `gorm:"primary_key"`
+	USERID   uint   `gorm:"primary_key" json:"user_id"`
 	EMAIL    string `gorm:"unique" json:"email"`
 	LOGIN    string `gorm:"unique" json:"login"`
 	USERNAME string `json:"username"`
