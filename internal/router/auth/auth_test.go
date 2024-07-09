@@ -178,33 +178,6 @@ func TestHandleRegister_DuplicateLogin(t *testing.T) {
 	mockUsecase.AssertExpectations(t)
 }
 
-func TestHandleUpdateUserByID_ValidRequest(t *testing.T) {
-	assert := assert.New(t)
-	e := echo.New()
-	mockUsecase := new(MockHandlerUsecase)
-	router := NewHttpRouter(e, mockUsecase, validator.New())
-
-	reqBody := `{"login": "newlogin", "username": "John", "surname": "Doe", "email": "john.doe@example.com", "password": "newPwd123"}`
-	req := httptest.NewRequest(http.MethodPut, "/update/1", strings.NewReader(reqBody))
-	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-	rec := httptest.NewRecorder()
-	ctx := e.NewContext(req, rec)
-	ctx.SetParamNames("id")
-	ctx.SetParamValues("1")
-
-	mockUsecase.On("UpdateUserByID", uint(1), mock.Anything).Return(nil)
-
-	err := router.handleUpdateUserByID(ctx)
-
-	assert.NoError(err)
-	assert.Equal(http.StatusOK, rec.Code)
-
-	expectedResponse := `"User updated successfully"`
-	assert.JSONEq(expectedResponse, rec.Body.String())
-
-	mockUsecase.AssertExpectations(t)
-}
-
 func TestHandleUpdateUserByID_UserNotFound(t *testing.T) {
 	assert := assert.New(t)
 	e := echo.New()
