@@ -12,7 +12,7 @@ import (
 
 type IHandlerUsecase interface {
 	RegisterUser(user *dto.USERS) error
-	AuthenticateUser(login, password string) (*dto.USERS, error)
+	AuthenticateUser(login, password string) (string, error)
 	UpdateUserByID(id uint, user *dto.USERS) error
 }
 
@@ -69,13 +69,12 @@ func (h *HttpRouter) handleLogin(ctx echo.Context) error {
 		})
 	}
 
-	user, err := h.usecase.AuthenticateUser(req.Login, req.Password)
+	token, err := h.usecase.AuthenticateUser(req.Login, req.Password)
 	if err != nil {
 		return ctx.JSON(http.StatusUnauthorized, map[string]string{"error": err.Error()})
 	}
-	_ = user
 
-	return ctx.JSON(http.StatusOK, map[string]string{"message": "User authenticated successfully", "user": "jwt"})
+	return ctx.JSON(http.StatusOK, map[string]string{"message": "User authenticated successfully", "token": token})
 }
 
 func (h *HttpRouter) handleRegister(ctx echo.Context) error {
@@ -139,7 +138,6 @@ func (h *HttpRouter) handleUpdateUserByID(ctx echo.Context) error {
 	if err != nil {
 		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
 	}
-
 	updatedUser := &dto.USERS{
 		LOGIN:    req.Login,
 		USERNAME: req.Username,

@@ -1,5 +1,7 @@
 env: "dev"
 storage_path: "./storage/sso.db"
+key_private_path: "./gen/key/private.pem"
+key_public_path: "./gen/key/public.pem"
 token_ttl: 2h
 
 grpc:

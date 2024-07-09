@@ -1,2 +1,3 @@
 # .dockerignore
-!gen/go/
+!gen/go
+!gen/key

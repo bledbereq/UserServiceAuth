@@ -25,16 +25,15 @@ func (m *MockHandlerUsecase) RegisterUser(user *storage.USERS) error {
 	return args.Error(0)
 }
 
-func (m *MockHandlerUsecase) AuthenticateUser(login, password string) (*storage.USERS, error) {
+func (m *MockHandlerUsecase) AuthenticateUser(login, password string) (string, error) {
 	args := m.Called(login, password)
-	return args.Get(0).(*storage.USERS), args.Error(1)
+	return args.String(0), args.Error(1)
 }
 
 func (m *MockHandlerUsecase) UpdateUserByID(id uint, user *storage.USERS) error {
 	args := m.Called(id, user)
 	return args.Error(0)
 }
-
 func TestHandleLogin_ValidRequest(t *testing.T) {
 	assert := assert.New(t)
 	e := echo.New()

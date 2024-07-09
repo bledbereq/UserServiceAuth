@@ -8,7 +8,9 @@ tasks:
   generate:
     aliases:
       - gen
-    desc: "Generate code from proto files"
+    desc: "Generate code from proto files and keys"
     cmds:
       - mkdir -p ./gen/go
+      - mkdir -p ./gen/key
       - protoc -I proto proto/publickey.proto --go_out=./gen/go --go_opt=paths=source_relative --go-grpc_out=./gen/go/ --go-grpc_opt=paths=source_relative
+      - go run crypto/rsa_keygen.go

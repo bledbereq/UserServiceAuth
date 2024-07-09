@@ -1,6 +1,17 @@
 package main
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
+	"flag"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"sync"
+
 	"UserServiceAuth/internal/config"
 	auth "UserServiceAuth/internal/router/auth"
 	router "UserServiceAuth/internal/router/publickeygrpc"
@@ -8,14 +19,10 @@ import (
 	services "UserServiceAuth/internal/uscase"
 	"UserServiceAuth/storage"
 	"context"
-	"flag"
-	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
-	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 	"time"
 
@@ -72,8 +79,27 @@ func main() {
 	db := storage.InitDB(cfg)
 	userRepo := repositories.NewUserRepository(db)
 
-	// Создание сервиса
-	userService := services.NewUserService(userRepo)
+	if _, err := os.Stat(cfg.KeyPrivatePath); os.IsNotExist(err) {
+		fmt.Println("Private key not found, generating a new one...")
+		if err := generateKeyPair(cfg.KeyPrivatePath, cfg.KeyPublicPath); err != nil {
+			fmt.Printf("Error: failed to generate key pair: %v\n", err)
+			return
+		}
+		fmt.Println("Key pair generated successfully.")
+	} else {
+		fmt.Println("Private key already exists.")
+	}
+
+	privateKey, err := loadPrivateKeyFromFile(cfg.KeyPrivatePath)
+	if err != nil {
+		log.Error("ошибка при загрузке приватного ключа", "error", err)
+		return
+	}
+
+	tokenService := services.NewTokenService(privateKey)
+
+	// Инициализация UserService с использованием tokenService
+	userService := services.NewUserService(userRepo, tokenService)
 
 	// Создание валидатора
 	validator := validator.New()
@@ -137,4 +163,79 @@ func setupLogger(env string) *slog.Logger {
 	}
 
 	return log
+}
+
+func loadPrivateKeyFromFile(privateKeyFile string) (*rsa.PrivateKey, error) {
+	// Читаем содержимое файла
+	privateKeyBytes, err := ioutil.ReadFile(privateKeyFile)
+	if err != nil {
+		return nil, fmt.Errorf("ошибка чтения файла приватного ключа: %w", err)
+	}
+
+	// Декодируем PEM-блок
+	block, _ := pem.Decode(privateKeyBytes)
+	if block == nil {
+		return nil, fmt.Errorf("ошибка декодирования PEM блока")
+	}
+
+	// Парсим закрытый ключ RSA
+	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("ошибка парсинга приватного ключа: %w", err)
+	}
+
+	return privateKey, nil
+}
+
+func generateKeyPair(privateKeyPath, publicKeyPath string) error {
+	// Create the directory if it doesn't exist
+	if err := os.MkdirAll(filepath.Dir(privateKeyPath), os.ModePerm); err != nil {
+		return fmt.Errorf("failed to create directory: %v", err)
+	}
+
+	// Generate private key
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return fmt.Errorf("failed to generate private key: %v", err)
+	}
+
+	// Create and write private key file
+	privateFile, err := os.Create(privateKeyPath)
+	if err != nil {
+		return fmt.Errorf("failed to create private key file: %v", err)
+	}
+	defer privateFile.Close()
+
+	privatePEM := &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+	}
+	if err := pem.Encode(privateFile, privatePEM); err != nil {
+		return fmt.Errorf("failed to write private key: %v", err)
+	}
+
+	// Generate public key
+	publicKey := &privateKey.PublicKey
+
+	// Create and write public key file
+	publicFile, err := os.Create(publicKeyPath)
+	if err != nil {
+		return fmt.Errorf("failed to create public key file: %v", err)
+	}
+	defer publicFile.Close()
+
+	publicPEM, err := x509.MarshalPKIXPublicKey(publicKey)
+	if err != nil {
+		return fmt.Errorf("failed to marshal public key: %v", err)
+	}
+
+	publicPEMBlock := &pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: publicPEM,
+	}
+	if err := pem.Encode(publicFile, publicPEMBlock); err != nil {
+		return fmt.Errorf("failed to write public key: %v", err)
+	}
+
+	return nil
 }

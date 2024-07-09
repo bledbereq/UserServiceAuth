@@ -8,10 +8,14 @@ import (
 )
 
 type Config struct {
-	Env  string           `yaml:"env" env-default:"local"`
-	GRPC GRPCconfig       `yaml:"grpc" env-required:"true"`
-	HTTP HttpServerConfig `yaml:"http_server" env-required:"true"`
-	DB   DBauthConfig     `yaml:"db"`
+	Env            string           `yaml:"env" env-default:"local"`
+	StoragePath    string           `yaml:"storage_path" env-required:"true"`
+	KeyPrivatePath string           `yaml:"key_private_path" env-required:"true"`
+	KeyPublicPath  string           `yaml:"key_public_path" env-required:"true"`
+	TokenTTL       time.Duration    `yaml:"token_ttl" env-required:"true"`
+	GRPC           GRPCconfig       `yaml:"grpc" env-required:"true"`
+	HTTP           HttpServerConfig `yaml:"http_server" env-required:"true"`
+	DB             DBauthConfig     `yaml:"db"`
 }
 
 type GRPCconfig struct {

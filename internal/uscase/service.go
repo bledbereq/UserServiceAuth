@@ -1,4 +1,4 @@
-package service
+package uscase
 
 import (
 	models "UserServiceAuth/storage"
@@ -15,11 +15,12 @@ type IUserRepository interface {
 }
 
 type UserService struct {
-	userRepo IUserRepository
+	userRepo     IUserRepository
+	tokenService *TokenService
 }
 
-func NewUserService(userRepo IUserRepository) *UserService {
-	return &UserService{userRepo: userRepo}
+func NewUserService(userRepo IUserRepository, tokenService *TokenService) *UserService {
+	return &UserService{userRepo: userRepo, tokenService: tokenService}
 }
 
 func (s *UserService) RegisterUser(user *models.USERS) error {
@@ -33,15 +34,21 @@ func (s *UserService) RegisterUser(user *models.USERS) error {
 	return s.userRepo.CreateUser(user)
 }
 
-func (s *UserService) AuthenticateUser(login, password string) (*models.USERS, error) {
+func (s *UserService) AuthenticateUser(login, password string) (string, error) {
 	user, err := s.userRepo.GetUserByLogin(login)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	if user.PASSWORD != password {
-		return nil, errors.New("invalid login or password")
+		return "", errors.New("invalid login or password")
 	}
-	return user, nil
+
+	token, err := s.tokenService.GenerateToken(user.USERID, user.USERNAME, user.EMAIL)
+	if err != nil {
+		return "", err
+	}
+
+	return token, nil
 }
 
 func (s *UserService) UpdateUserByID(id uint, updatedUser *models.USERS) error {

@@ -38,6 +38,7 @@ require (
 
 require (
 	github.com/BurntSushi/toml v1.2.1 // indirect
+	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/go-playground/validator/v10 v10.22.0
 	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/labstack/echo/v4 v4.12.0
