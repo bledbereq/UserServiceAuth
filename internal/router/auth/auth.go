@@ -2,7 +2,6 @@ package auth
 
 import (
 	"net/http"
-	"strconv"
 
 	dto "UserServiceAuth/storage"
 
@@ -13,7 +12,7 @@ import (
 type IHandlerUsecase interface {
 	RegisterUser(user *dto.USERS) error
 	AuthenticateUser(login, password string) (string, error)
-	UpdateUserByID(id uint, user *dto.USERS) error
+	UpdateUserByLogin(login, token string, user *dto.USERS) error
 }
 
 type HttpRouter struct {
@@ -22,7 +21,6 @@ type HttpRouter struct {
 }
 
 func NewHttpRouter(e *echo.Echo, usecase IHandlerUsecase, validator *validator.Validate) *HttpRouter {
-
 	e.Validator = &CustomValidator{validator}
 
 	router := &HttpRouter{
@@ -32,7 +30,7 @@ func NewHttpRouter(e *echo.Echo, usecase IHandlerUsecase, validator *validator.V
 
 	e.POST("/login", router.handleLogin)
 	e.POST("/register", router.handleRegister)
-	e.PUT("/update/:id", router.handleUpdateUserByID)
+	e.PUT("/update/:login", router.handleUpdateUserByLogin)
 
 	return router
 }
@@ -113,7 +111,7 @@ func (h *HttpRouter) handleRegister(ctx echo.Context) error {
 	return ctx.JSON(http.StatusCreated, "User registered successfully")
 }
 
-func (h *HttpRouter) handleUpdateUserByID(ctx echo.Context) error {
+func (h *HttpRouter) handleUpdateUserByLogin(ctx echo.Context) error {
 	type UpdateRequest struct {
 		Login    string `json:"login" validate:"required"`
 		Username string `json:"username" validate:"required"`
@@ -134,10 +132,13 @@ func (h *HttpRouter) handleUpdateUserByID(ctx echo.Context) error {
 		})
 	}
 
-	id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
-	if err != nil {
-		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
+	login := ctx.Param("login")
+	token := ctx.Request().Header.Get("Authorization")
+
+	if token == "" {
+		return ctx.JSON(http.StatusUnauthorized, map[string]string{"error": "Missing token"})
 	}
+
 	updatedUser := &dto.USERS{
 		LOGIN:    req.Login,
 		USERNAME: req.Username,
@@ -146,8 +147,8 @@ func (h *HttpRouter) handleUpdateUserByID(ctx echo.Context) error {
 		PASSWORD: req.Password,
 	}
 
-	if err := h.usecase.UpdateUserByID(uint(id), updatedUser); err != nil {
-		if err.Error() == "user with this id not exists" {
+	if err := h.usecase.UpdateUserByLogin(login, token, updatedUser); err != nil {
+		if err.Error() == "user with this login not exists" {
 			return ctx.JSON(http.StatusNotFound, map[string]string{"error": err.Error()})
 		}
 		return ctx.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})

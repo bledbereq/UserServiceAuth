@@ -11,8 +11,7 @@ import (
 type IUserRepository interface {
 	CreateUser(user *dto.USERS) error
 	GetUserByLogin(login string) (*dto.USERS, error)
-	UpdateUserByID(id uint, updatedUser *dto.USERS) error
-	GetUserByID(id uint) (*dto.USERS, error)
+	UpdateUserByLogin(login string, updatedUser *dto.USERS) error
 	SaveToken(token *dto.TOKENS) error
 }
 
@@ -45,7 +44,7 @@ func (s *UserService) AuthenticateUser(login, password string) (string, error) {
 		return "", errors.New("invalid login or password")
 	}
 
-	token, err := s.tokenService.GenerateToken(user.USERID, user.USERNAME, user.EMAIL)
+	token, err := s.tokenService.GenerateToken(user.USERNAME, user.EMAIL, user.LOGIN)
 	if err != nil {
 		return "", err
 	}
@@ -66,15 +65,25 @@ func (s *UserService) AuthenticateUser(login, password string) (string, error) {
 	return token, nil
 }
 
-func (s *UserService) UpdateUserByID(id uint, updatedUser *dto.USERS) error {
-	existingID, err := s.userRepo.GetUserByID(id)
+func (s *UserService) UpdateUserByLogin(login, token string, updatedUser *dto.USERS) error {
+	claims, err := s.tokenService.ValidateToken(token)
+	if err != nil {
+		return err // Возвращаем ошибку из ValidateToken
+	}
 
+	// Проверяем, что пользователь из токена имеет право на обновление данных
+	tokenLogin, ok := claims["login"].(string)
+	if !ok || tokenLogin != login {
+		return errors.New("token is not authorized for this user")
+	}
+
+	existingLogin, err := s.userRepo.GetUserByLogin(login)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
-	if existingID == nil {
-		return errors.New("user with this id not exists")
+	if existingLogin == nil {
+		return errors.New("user with this login not exists")
 	}
 
-	return s.userRepo.UpdateUserByID(id, updatedUser)
+	return s.userRepo.UpdateUserByLogin(login, updatedUser)
 }

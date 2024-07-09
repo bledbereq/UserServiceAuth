@@ -96,7 +96,7 @@ func main() {
 		return
 	}
 
-	tokenService := services.NewTokenService(privateKey)
+	tokenService := services.NewTokenService(privateKey, &privateKey.PublicKey)
 
 	// Инициализация UserService с использованием tokenService
 	userService := services.NewUserService(userRepo, tokenService)

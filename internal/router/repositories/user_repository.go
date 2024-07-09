@@ -36,8 +36,8 @@ func (r *UserRepository) GetUserByID(id uint) (*models.USERS, error) {
 	return &user, nil
 }
 
-func (r *UserRepository) UpdateUserByID(id uint, updatedUser *models.USERS) error {
-	return r.db.Model(&models.USERS{}).Where("user_id = ?", id).Updates(updatedUser).Error
+func (r *UserRepository) UpdateUserByLogin(login string, updatedUser *models.USERS) error {
+	return r.db.Model(&models.USERS{}).Where("login = ?", login).Updates(updatedUser).Error
 }
 
 func (r *UserRepository) SaveToken(token *models.TOKENS) error {
