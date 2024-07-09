@@ -39,3 +39,7 @@ func (r *UserRepository) GetUserByID(id uint) (*models.USERS, error) {
 func (r *UserRepository) UpdateUserByID(id uint, updatedUser *models.USERS) error {
 	return r.db.Model(&models.USERS{}).Where("user_id = ?", id).Updates(updatedUser).Error
 }
+
+func (r *UserRepository) SaveToken(token *models.TOKENS) error {
+	return r.db.Create(token).Error
+}
