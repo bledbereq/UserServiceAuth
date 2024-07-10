@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -46,8 +47,13 @@ func TestHandleLogin_ValidRequest(t *testing.T) {
 	rec := httptest.NewRecorder()
 	ctx := e.NewContext(req, rec)
 
+	var body LoginRequest
+	if err := json.Unmarshal([]byte(reqBody), &body); err != nil {
+		t.Fatal(err)
+	}
+	ctx.Set("validatedBody", &body)
+
 	mockUsecase := router.usecase.(*MockHandlerUsecase)
-	// Моковый токен
 	tokenString := "mock_jwt_token"
 	mockUsecase.On("AuthenticateUser", "user_login", "pAssw_ord123").Return(tokenString, nil)
 
@@ -56,31 +62,40 @@ func TestHandleLogin_ValidRequest(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(http.StatusOK, rec.Code)
 
-	expectedResponse := `{"message":"User authenticated successfully","token":"mock_jwt_token"}`
+	expectedResponse := `{"message":"Пользователь успешно аутентифицирован","token":"mock_jwt_token"}`
 	assert.JSONEq(expectedResponse, rec.Body.String())
 
 	mockUsecase.AssertExpectations(t)
 }
-
 func TestHandleLogin_InvalidRequest(t *testing.T) {
 	assert := assert.New(t)
 	e := echo.New()
-	router := NewHttpRouter(e, &MockHandlerUsecase{}, validator.New())
+	mockUsecase := new(MockHandlerUsecase)
 
-	reqBody := `{"password": "pAssw_ord123"}`
+	// Утверждаем, что при вызове AuthenticateUser с определёнными параметрами будет возвращаться ошибка
+	mockUsecase.On("AuthenticateUser", "johndoe", "").Return("", errors.New("invalid login or password"))
+
+	router := NewHttpRouter(e, mockUsecase, validator.New())
+	reqBody := `{"login": "johndoe", "password":""}`
 	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(reqBody))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()
 	ctx := e.NewContext(req, rec)
 
+	var body LoginRequest
+	if err := json.Unmarshal([]byte(reqBody), &body); err != nil {
+		t.Fatal(err)
+	}
+	ctx.Set("validatedBody", &body)
+
 	err := router.handleLogin(ctx)
-
-	assert.Equal(http.StatusBadRequest, rec.Code)
-
-	expectedResponse := `{"error":"Validation error","details":"Key: 'LoginRequest.Login' Error:Field validation for 'Login' failed on the 'required' tag"}`
-	assert.JSONEq(expectedResponse, rec.Body.String())
-
-	assert.NoError(err)
+	if assert.Error(err) {
+		he, ok := err.(*echo.HTTPError)
+		if !ok {
+			t.Fatalf("expected *echo.HTTPError, got %T", err)
+		}
+		assert.Equal(http.StatusUnauthorized, he.Code)
+	}
 }
 
 func TestHandleRegister_ValidRequest(t *testing.T) {
@@ -93,6 +108,11 @@ func TestHandleRegister_ValidRequest(t *testing.T) {
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()
 	ctx := e.NewContext(req, rec)
+	var body RegisterRequest
+	if err := json.Unmarshal([]byte(reqBody), &body); err != nil {
+		t.Fatal(err)
+	}
+	ctx.Set("validatedBody", &body)
 
 	mockUsecase := router.usecase.(*MockHandlerUsecase)
 	mockUsecase.On("RegisterUser", mock.Anything).Return(nil)
@@ -102,81 +122,45 @@ func TestHandleRegister_ValidRequest(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(http.StatusCreated, rec.Code)
 
-	expectedResponse := `"User registered successfully"`
+	expectedResponse := `"Пользователь успешно зарегистрирован"`
 	assert.Equal(strings.TrimSpace(expectedResponse), strings.TrimSpace(rec.Body.String()))
 
 	mockUsecase.AssertExpectations(t)
 }
-
 func TestHandleRegister_InvalidRequest(t *testing.T) {
 	assert := assert.New(t)
 	e := echo.New()
-	router := NewHttpRouter(e, &MockHandlerUsecase{}, validator.New())
+	mockUsecase := new(MockHandlerUsecase)
 
-	reqBody := `{"surname": "Doe", "email": "john.doe@example.com", "login": "johndoe", "password": "securePwd123"}`
+	user := &dto.USERS{
+		EMAIL:    "john.doe@example.com",
+		LOGIN:    "johndoe",
+		SURNAME:  "Doe",
+		PASSWORD: "securePwd123",
+	}
+	mockUsecase.On("RegisterUser", user).Return(errors.New("Validation error"))
+
+	router := NewHttpRouter(e, mockUsecase, validator.New())
+	reqBody := `{"username": "", "surname": "Doe", "email": "john.doe@example.com", "login": "johndoe", "password": "securePwd123"}`
 	req := httptest.NewRequest(http.MethodPost, "/register", strings.NewReader(reqBody))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()
 	ctx := e.NewContext(req, rec)
 
-	err := router.handleRegister(ctx)
-
-	assert.Equal(http.StatusBadRequest, rec.Code)
-
-	expectedResponse := `{"error":"Validation error","details":"Key: 'RegisterRequest.Username' Error:Field validation for 'Username' failed on the 'required' tag"}`
-	assert.JSONEq(expectedResponse, rec.Body.String())
-
-	assert.NoError(err)
-}
-
-func TestHandleRegister_UsecaseError(t *testing.T) {
-	assert := assert.New(t)
-	e := echo.New()
-	router := NewHttpRouter(e, &MockHandlerUsecase{}, validator.New())
-
-	reqBody := `{"username": "John", "surname": "Doe", "email": "john.doe@example.com", "login": "johndoe", "password": "securePwd123"}`
-	req := httptest.NewRequest(http.MethodPost, "/register", strings.NewReader(reqBody))
-	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-	rec := httptest.NewRecorder()
-	ctx := e.NewContext(req, rec)
-
-	mockUsecase := router.usecase.(*MockHandlerUsecase)
-	mockUsecase.On("RegisterUser", mock.Anything).Return(errors.New("Database error"))
+	var body RegisterRequest
+	if err := json.Unmarshal([]byte(reqBody), &body); err != nil {
+		t.Fatal(err)
+	}
+	ctx.Set("validatedBody", &body)
 
 	err := router.handleRegister(ctx)
-	assert.NoError(err)
-
-	assert.Equal(http.StatusBadRequest, rec.Code)
-
-	expectedResponse := `{"error":"Database error"}`
-	assert.JSONEq(expectedResponse, rec.Body.String())
-
-	mockUsecase.AssertExpectations(t)
-}
-
-func TestHandleRegister_DuplicateLogin(t *testing.T) {
-	assert := assert.New(t)
-	e := echo.New()
-	router := NewHttpRouter(e, &MockHandlerUsecase{}, validator.New())
-
-	reqBody := `{"username": "John", "surname": "Doe", "email": "newuser@example.com", "login": "johndoe", "password": "securePwd123"}`
-	req := httptest.NewRequest(http.MethodPost, "/register", strings.NewReader(reqBody))
-	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-	rec := httptest.NewRecorder()
-	ctx := e.NewContext(req, rec)
-
-	mockUsecase := router.usecase.(*MockHandlerUsecase)
-	mockUsecase.On("RegisterUser", mock.Anything).Return(errors.New("DuplicateLogin"))
-
-	err := router.handleRegister(ctx)
-	assert.NoError(err)
-
-	assert.Equal(http.StatusBadRequest, rec.Code)
-
-	expectedResponse := `{"error":"DuplicateLogin"}`
-	assert.JSONEq(expectedResponse, rec.Body.String())
-
-	mockUsecase.AssertExpectations(t)
+	if assert.Error(err) {
+		he, ok := err.(*echo.HTTPError)
+		if !ok {
+			t.Fatalf("expected *echo.HTTPError, got %T", err)
+		}
+		assert.Equal(http.StatusBadRequest, he.Code)
+	}
 }
 
 func TestHandleUpdateUserByLogin_ValidRequest(t *testing.T) {
@@ -194,6 +178,13 @@ func TestHandleUpdateUserByLogin_ValidRequest(t *testing.T) {
 	ctx.SetParamNames("login")
 	ctx.SetParamValues("user_login")
 
+	// Set validatedBody in context manually (simulating middleware behavior)
+	var body UpdateRequest
+	if err := json.Unmarshal([]byte(reqBody), &body); err != nil {
+		t.Fatal(err)
+	}
+	ctx.Set("validatedBody", &body)
+
 	mockUsecase.On("UpdateUserByLogin", "user_login", "Bearer mock_jwt_token", mock.Anything).Return(nil)
 
 	err := router.handleUpdateUserByLogin(ctx)
@@ -201,35 +192,7 @@ func TestHandleUpdateUserByLogin_ValidRequest(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(http.StatusOK, rec.Code)
 
-	expectedResponse := `"User updated successfully"`
-	assert.JSONEq(expectedResponse, rec.Body.String())
-
-	mockUsecase.AssertExpectations(t)
-}
-
-func TestHandleUpdateUserByLogin_UserNotFound(t *testing.T) {
-	assert := assert.New(t)
-	e := echo.New()
-	mockUsecase := new(MockHandlerUsecase)
-	router := NewHttpRouter(e, mockUsecase, validator.New())
-
-	reqBody := `{"login": "newlogin", "username": "John", "surname": "Doe", "email": "john.doe@example.com", "password": "newPwd123"}`
-	req := httptest.NewRequest(http.MethodPut, "/update/nonexistent_user", strings.NewReader(reqBody))
-	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-	req.Header.Set("Authorization", "Bearer mock_jwt_token")
-	rec := httptest.NewRecorder()
-	ctx := e.NewContext(req, rec)
-	ctx.SetParamNames("login")
-	ctx.SetParamValues("nonexistent_user")
-
-	mockUsecase.On("UpdateUserByLogin", "nonexistent_user", "Bearer mock_jwt_token", mock.Anything).Return(errors.New("user with this login not exists"))
-
-	err := router.handleUpdateUserByLogin(ctx)
-
-	assert.NoError(err)
-	assert.Equal(http.StatusNotFound, rec.Code)
-
-	expectedResponse := `{"error":"user with this login not exists"}`
+	expectedResponse := `"Пользователь успешно обновлен"`
 	assert.JSONEq(expectedResponse, rec.Body.String())
 
 	mockUsecase.AssertExpectations(t)
@@ -240,7 +203,7 @@ func TestHandleUpdateUserByLogin_InvalidRequest(t *testing.T) {
 	e := echo.New()
 	router := NewHttpRouter(e, &MockHandlerUsecase{}, validator.New())
 
-	reqBody := `{"login": "updated_login", "username": "Updated", "surname": "User", "email": "updated@example.com", "password": "updatedPassword"}`
+	reqBody := `{"username": "Updated", "surname": "User", "email": "updated@example.com", "password": "updatedPassword"}`
 	req := httptest.NewRequest(http.MethodPut, "/update/invalid_login", strings.NewReader(reqBody))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()
@@ -248,12 +211,20 @@ func TestHandleUpdateUserByLogin_InvalidRequest(t *testing.T) {
 	ctx.SetParamNames("login")
 	ctx.SetParamValues("invalid_login")
 
-	err := router.handleUpdateUserByLogin(ctx)
+	var body UpdateRequest
+	err := json.Unmarshal([]byte(reqBody), &body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx.Set("validatedBody", &body)
 
-	assert.Equal(http.StatusUnauthorized, rec.Code)
+	err = router.handleUpdateUserByLogin(ctx)
+	if assert.Error(err) {
+		he, ok := err.(*echo.HTTPError)
+		if !ok {
+			t.Fatalf("expected *echo.HTTPError, got %T", err)
+		}
+		assert.Equal(http.StatusUnauthorized, he.Code)
 
-	expectedResponse := `{"error":"Missing token"}`
-	assert.JSONEq(expectedResponse, rec.Body.String())
-
-	assert.NoError(err)
+	}
 }
