@@ -2,6 +2,7 @@ package auth
 
 import (
 	"net/http"
+	"strings"
 
 	dto "UserServiceAuth/storage"
 
@@ -27,6 +28,7 @@ func NewHttpRouter(e *echo.Echo, usecase IHandlerUsecase, validator *validator.V
 		validator: validator,
 		usecase:   usecase,
 	}
+	e.Use(router.validateMiddleware)
 
 	e.POST("/login", router.handleLogin)
 	e.POST("/register", router.handleRegister)
@@ -49,52 +51,62 @@ func (cv *CustomValidator) Validate(i interface{}) error {
 	return nil
 }
 
+func (h *HttpRouter) validateMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(ctx echo.Context) error {
+		req := ctx.Request()
+
+		// Validate request content type
+		contentType := req.Header.Get(echo.HeaderContentType)
+		if contentType != echo.MIMEApplicationJSON {
+			return echo.NewHTTPError(http.StatusBadRequest, "Invalid Content-Type, expected application/json")
+		}
+
+		// Determine the appropriate struct based on the request path
+		var body interface{}
+		path := ctx.Path()
+		switch {
+		case strings.HasSuffix(path, "/login"):
+			body = new(LoginRequest)
+		case strings.HasSuffix(path, "/register"):
+			body = new(RegisterRequest)
+		case strings.HasSuffix(path, "/update/:login"):
+			body = new(UpdateRequest)
+		default:
+			return echo.NewHTTPError(http.StatusBadRequest, "Invalid request path")
+		}
+
+		if err := ctx.Bind(body); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "Invalid request body")
+		}
+
+		if err := h.validator.Struct(body); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, map[string]interface{}{
+				"error":   "Validation error",
+				"details": err.Error(),
+			})
+		}
+
+		ctx.Set("validatedBody", body)
+
+		return next(ctx)
+	}
+}
+
 func (h *HttpRouter) handleLogin(ctx echo.Context) error {
-	type LoginRequest struct {
-		Login    string `json:"login" validate:"required"`
-		Password string `json:"password" validate:"required"`
-	}
-
-	req := new(LoginRequest)
-	if err := ctx.Bind(req); err != nil {
-		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request format"})
-	}
-
-	if err := h.validator.Struct(req); err != nil {
-		return ctx.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error":   "Validation error",
-			"details": err.Error(),
-		})
-	}
-
+	req := ctx.Get("validatedBody").(*LoginRequest)
 	token, err := h.usecase.AuthenticateUser(req.Login, req.Password)
 	if err != nil {
-		return ctx.JSON(http.StatusUnauthorized, map[string]string{"error": err.Error()})
+		return echo.NewHTTPError(http.StatusUnauthorized, map[string]string{"error": err.Error()})
 	}
 
-	return ctx.JSON(http.StatusOK, map[string]string{"message": "User authenticated successfully", "token": token})
+	return ctx.JSON(http.StatusOK, map[string]interface{}{
+		"message": "Пользователь успешно аутентифицирован",
+		"token":   token,
+	})
 }
 
 func (h *HttpRouter) handleRegister(ctx echo.Context) error {
-	type RegisterRequest struct {
-		Username string `json:"username" validate:"required"`
-		Surname  string `json:"surname" validate:"required"`
-		Email    string `json:"email" validate:"required,email"`
-		Login    string `json:"login" validate:"required"`
-		Password string `json:"password" validate:"required"`
-	}
-
-	req := new(RegisterRequest)
-	if err := ctx.Bind(req); err != nil {
-		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request format"})
-	}
-
-	if err := h.validator.Struct(req); err != nil {
-		return ctx.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error":   "Validation error",
-			"details": err.Error(),
-		})
-	}
+	req := ctx.Get("validatedBody").(*RegisterRequest)
 
 	user := &dto.USERS{
 		USERNAME: req.Username,
@@ -105,54 +117,55 @@ func (h *HttpRouter) handleRegister(ctx echo.Context) error {
 	}
 
 	if err := h.usecase.RegisterUser(user); err != nil {
-		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return echo.NewHTTPError(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
 
-	return ctx.JSON(http.StatusCreated, "User registered successfully")
+	return ctx.JSON(http.StatusCreated, "Пользователь успешно зарегистрирован")
 }
 
 func (h *HttpRouter) handleUpdateUserByLogin(ctx echo.Context) error {
-	type UpdateRequest struct {
-		Login    string `json:"login" validate:"required"`
-		Username string `json:"username" validate:"required"`
-		Surname  string `json:"surname" validate:"required"`
-		Email    string `json:"email" validate:"required,email"`
-		Password string `json:"password" validate:"required"`
-	}
-
-	req := new(UpdateRequest)
-	if err := ctx.Bind(req); err != nil {
-		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request format"})
-	}
-
-	if err := h.validator.Struct(req); err != nil {
-		return ctx.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error":   "Validation error",
-			"details": err.Error(),
-		})
-	}
-
+	req := ctx.Get("validatedBody").(*UpdateRequest)
 	login := ctx.Param("login")
 	token := ctx.Request().Header.Get("Authorization")
 
 	if token == "" {
-		return ctx.JSON(http.StatusUnauthorized, map[string]string{"error": "Missing token"})
+		return echo.NewHTTPError(http.StatusUnauthorized, "Отсутствует токен авторизации")
 	}
 
 	updatedUser := &dto.USERS{
-		LOGIN:    req.Login,
 		USERNAME: req.Username,
 		SURNAME:  req.Surname,
 		EMAIL:    req.Email,
 		PASSWORD: req.Password,
 	}
 
-	if err := h.usecase.UpdateUserByLogin(login, token, updatedUser); err != nil {
+	err := h.usecase.UpdateUserByLogin(login, token, updatedUser)
+	if err != nil {
 		if err.Error() == "user with this login not exists" {
-			return ctx.JSON(http.StatusNotFound, map[string]string{"error": err.Error()})
+			return echo.NewHTTPError(http.StatusNotFound, map[string]string{"error": err.Error()})
 		}
-		return ctx.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
 
-	return ctx.JSON(http.StatusOK, "User updated successfully")
+	return ctx.JSON(http.StatusOK, "Пользователь успешно обновлен")
+}
+
+type LoginRequest struct {
+	Login    string `json:"login" validate:"required"`
+	Password string `json:"password" validate:"required"`
+}
+
+type RegisterRequest struct {
+	Username string `json:"username" validate:"required"`
+	Surname  string `json:"surname" validate:"required"`
+	Email    string `json:"email" validate:"required,email"`
+	Login    string `json:"login" validate:"required"`
+	Password string `json:"password" validate:"required"`
+}
+
+type UpdateRequest struct {
+	Username string `json:"username" validate:"required"`
+	Surname  string `json:"surname" validate:"required"`
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required"`
 }

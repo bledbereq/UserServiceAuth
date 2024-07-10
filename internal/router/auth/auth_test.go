@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"UserServiceAuth/storage"
+	dto "UserServiceAuth/storage"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -20,7 +20,7 @@ type MockHandlerUsecase struct {
 	mock.Mock
 }
 
-func (m *MockHandlerUsecase) RegisterUser(user *storage.USERS) error {
+func (m *MockHandlerUsecase) RegisterUser(user *dto.USERS) error {
 	args := m.Called(user)
 	return args.Error(0)
 }
@@ -30,10 +30,11 @@ func (m *MockHandlerUsecase) AuthenticateUser(login, password string) (string, e
 	return args.String(0), args.Error(1)
 }
 
-func (m *MockHandlerUsecase) UpdateUserByID(id uint, user *storage.USERS) error {
-	args := m.Called(id, user)
+func (m *MockHandlerUsecase) UpdateUserByLogin(login, token string, user *dto.USERS) error {
+	args := m.Called(login, token, user)
 	return args.Error(0)
 }
+
 func TestHandleLogin_ValidRequest(t *testing.T) {
 	assert := assert.New(t)
 	e := echo.New()
@@ -46,15 +47,16 @@ func TestHandleLogin_ValidRequest(t *testing.T) {
 	ctx := e.NewContext(req, rec)
 
 	mockUsecase := router.usecase.(*MockHandlerUsecase)
-	user := &storage.USERS{USERID: 1}
-	mockUsecase.On("AuthenticateUser", "user_login", "pAssw_ord123").Return(user, nil)
+	// Моковый токен
+	tokenString := "mock_jwt_token"
+	mockUsecase.On("AuthenticateUser", "user_login", "pAssw_ord123").Return(tokenString, nil)
 
 	err := router.handleLogin(ctx)
 
 	assert.NoError(err)
 	assert.Equal(http.StatusOK, rec.Code)
 
-	expectedResponse := `{"message":"User authenticated successfully","user":"jwt"}`
+	expectedResponse := `{"message":"User authenticated successfully","token":"mock_jwt_token"}`
 	assert.JSONEq(expectedResponse, rec.Body.String())
 
 	mockUsecase.AssertExpectations(t)
@@ -177,23 +179,24 @@ func TestHandleRegister_DuplicateLogin(t *testing.T) {
 	mockUsecase.AssertExpectations(t)
 }
 
-func TestHandleUpdateUserByID_ValidRequest(t *testing.T) {
+func TestHandleUpdateUserByLogin_ValidRequest(t *testing.T) {
 	assert := assert.New(t)
 	e := echo.New()
 	mockUsecase := new(MockHandlerUsecase)
 	router := NewHttpRouter(e, mockUsecase, validator.New())
 
 	reqBody := `{"login": "newlogin", "username": "John", "surname": "Doe", "email": "john.doe@example.com", "password": "newPwd123"}`
-	req := httptest.NewRequest(http.MethodPut, "/update/1", strings.NewReader(reqBody))
+	req := httptest.NewRequest(http.MethodPut, "/update/user_login", strings.NewReader(reqBody))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	req.Header.Set("Authorization", "Bearer mock_jwt_token")
 	rec := httptest.NewRecorder()
 	ctx := e.NewContext(req, rec)
-	ctx.SetParamNames("id")
-	ctx.SetParamValues("1")
+	ctx.SetParamNames("login")
+	ctx.SetParamValues("user_login")
 
-	mockUsecase.On("UpdateUserByID", uint(1), mock.Anything).Return(nil)
+	mockUsecase.On("UpdateUserByLogin", "user_login", "Bearer mock_jwt_token", mock.Anything).Return(nil)
 
-	err := router.handleUpdateUserByID(ctx)
+	err := router.handleUpdateUserByLogin(ctx)
 
 	assert.NoError(err)
 	assert.Equal(http.StatusOK, rec.Code)
@@ -204,48 +207,52 @@ func TestHandleUpdateUserByID_ValidRequest(t *testing.T) {
 	mockUsecase.AssertExpectations(t)
 }
 
-func TestHandleUpdateUserByID_UserNotFound(t *testing.T) {
+func TestHandleUpdateUserByLogin_UserNotFound(t *testing.T) {
 	assert := assert.New(t)
 	e := echo.New()
 	mockUsecase := new(MockHandlerUsecase)
 	router := NewHttpRouter(e, mockUsecase, validator.New())
 
 	reqBody := `{"login": "newlogin", "username": "John", "surname": "Doe", "email": "john.doe@example.com", "password": "newPwd123"}`
-	req := httptest.NewRequest(http.MethodPut, "/update/999", strings.NewReader(reqBody))
+	req := httptest.NewRequest(http.MethodPut, "/update/nonexistent_user", strings.NewReader(reqBody))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	req.Header.Set("Authorization", "Bearer mock_jwt_token")
 	rec := httptest.NewRecorder()
 	ctx := e.NewContext(req, rec)
-	ctx.SetParamNames("id")
-	ctx.SetParamValues("999")
+	ctx.SetParamNames("login")
+	ctx.SetParamValues("nonexistent_user")
 
-	mockUsecase.On("UpdateUserByID", uint(999), mock.Anything).Return(errors.New("user with this id not exists"))
+	mockUsecase.On("UpdateUserByLogin", "nonexistent_user", "Bearer mock_jwt_token", mock.Anything).Return(errors.New("user with this login not exists"))
 
-	err := router.handleUpdateUserByID(ctx)
+	err := router.handleUpdateUserByLogin(ctx)
 
 	assert.NoError(err)
 	assert.Equal(http.StatusNotFound, rec.Code)
 
-	expectedResponse := `{"error":"user with this id not exists"}`
+	expectedResponse := `{"error":"user with this login not exists"}`
 	assert.JSONEq(expectedResponse, rec.Body.String())
 
 	mockUsecase.AssertExpectations(t)
 }
-func TestHandleUpdateUserByID_InvalidRequest(t *testing.T) {
+
+func TestHandleUpdateUserByLogin_InvalidRequest(t *testing.T) {
 	assert := assert.New(t)
 	e := echo.New()
 	router := NewHttpRouter(e, &MockHandlerUsecase{}, validator.New())
 
 	reqBody := `{"login": "updated_login", "username": "Updated", "surname": "User", "email": "updated@example.com", "password": "updatedPassword"}`
-	req := httptest.NewRequest(http.MethodPut, "/update/invalid_id", strings.NewReader(reqBody))
+	req := httptest.NewRequest(http.MethodPut, "/update/invalid_login", strings.NewReader(reqBody))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()
 	ctx := e.NewContext(req, rec)
+	ctx.SetParamNames("login")
+	ctx.SetParamValues("invalid_login")
 
-	err := router.handleUpdateUserByID(ctx)
+	err := router.handleUpdateUserByLogin(ctx)
 
-	assert.Equal(http.StatusBadRequest, rec.Code)
+	assert.Equal(http.StatusUnauthorized, rec.Code)
 
-	expectedResponse := `{"error":"Invalid user ID"}`
+	expectedResponse := `{"error":"Missing token"}`
 	assert.JSONEq(expectedResponse, rec.Body.String())
 
 	assert.NoError(err)
