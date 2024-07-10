@@ -54,14 +54,11 @@ func (cv *CustomValidator) Validate(i interface{}) error {
 func (h *HttpRouter) validateMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(ctx echo.Context) error {
 		req := ctx.Request()
-
-		// Validate request content type
 		contentType := req.Header.Get(echo.HeaderContentType)
 		if contentType != echo.MIMEApplicationJSON {
 			return echo.NewHTTPError(http.StatusBadRequest, "Invalid Content-Type, expected application/json")
 		}
 
-		// Determine the appropriate struct based on the request path
 		var body interface{}
 		path := ctx.Path()
 		switch {
