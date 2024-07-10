@@ -7,7 +7,7 @@ grpc:
   timeout: 30s
 
 http_server:
-  address: 0.0.0.0:8082
+  address: userserviceauth-app-1:8082
   timeout: 4s
   idle_timeout: 60s
   
