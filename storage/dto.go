@@ -18,3 +18,24 @@ type USERS struct {
 	PASSWORD string `json:"password" validate:"required"`
 	ISADMIN  bool   `gorm:"default:false" json:"isadmin"`
 }
+
+type LoginRequest struct {
+	Login    string `json:"login" validate:"required"`
+	Password string `json:"password" validate:"required"`
+}
+
+type RegisterRequest struct {
+	Username string `json:"username" validate:"required"`
+	Surname  string `json:"surname" validate:"required"`
+	Email    string `json:"email" validate:"required,email"`
+	Login    string `json:"login" validate:"required"`
+	Password string `json:"password" validate:"required"`
+}
+
+type UpdateRequest struct {
+	Username string `json:"username"`
+	Surname  string `json:"surname"`
+	Email    string `json:"email" validate:"email"`
+	Password string `json:"password" validate:"required" `
+	Login    string `json:"login" `
+}
