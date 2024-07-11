@@ -65,11 +65,11 @@ func (h *HttpRouter) validateMiddleware(next echo.HandlerFunc) echo.HandlerFunc 
 		path := ctx.Path()
 		switch {
 		case strings.HasSuffix(path, "/login"):
-			body = new(LoginRequest)
+			body = new(dto.LoginRequest)
 		case strings.HasSuffix(path, "/register"):
-			body = new(RegisterRequest)
+			body = new(dto.RegisterRequest)
 		case strings.HasSuffix(path, "/update/:login"):
-			body = new(UpdateRequest)
+			body = new(dto.UpdateRequest)
 		default:
 			return echo.NewHTTPError(http.StatusBadRequest, "Invalid request path")
 		}
@@ -92,7 +92,7 @@ func (h *HttpRouter) validateMiddleware(next echo.HandlerFunc) echo.HandlerFunc 
 }
 
 func (h *HttpRouter) handleLogin(ctx echo.Context) error {
-	req := ctx.Get("validatedBody").(*LoginRequest)
+	req := ctx.Get("validatedBody").(*dto.LoginRequest)
 	token, err := h.usecase.AuthenticateUser(req.Login, req.Password)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusUnauthorized, map[string]string{"error": err.Error()})
@@ -105,7 +105,7 @@ func (h *HttpRouter) handleLogin(ctx echo.Context) error {
 }
 
 func (h *HttpRouter) handleRegister(ctx echo.Context) error {
-	req := ctx.Get("validatedBody").(*RegisterRequest)
+	req := ctx.Get("validatedBody").(*dto.RegisterRequest)
 
 	user := &dto.USERS{
 		USERNAME: req.Username,
@@ -123,7 +123,7 @@ func (h *HttpRouter) handleRegister(ctx echo.Context) error {
 }
 
 func (h *HttpRouter) handleUpdateUserByLogin(ctx echo.Context) error {
-	req := ctx.Get("validatedBody").(*UpdateRequest)
+	req := ctx.Get("validatedBody").(*dto.UpdateRequest)
 	login := ctx.Param("login")
 	token := ctx.Request().Header.Get("Authorization")
 
@@ -147,24 +147,4 @@ func (h *HttpRouter) handleUpdateUserByLogin(ctx echo.Context) error {
 	}
 
 	return ctx.JSON(http.StatusOK, "Пользователь успешно обновлен")
-}
-
-type LoginRequest struct {
-	Login    string `json:"login" validate:"required"`
-	Password string `json:"password" validate:"required"`
-}
-
-type RegisterRequest struct {
-	Username string `json:"username" validate:"required"`
-	Surname  string `json:"surname" validate:"required"`
-	Email    string `json:"email" validate:"required,email"`
-	Login    string `json:"login" validate:"required"`
-	Password string `json:"password" validate:"required"`
-}
-
-type UpdateRequest struct {
-	Username string `json:"username" validate:"required"`
-	Surname  string `json:"surname" validate:"required"`
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required"`
 }
