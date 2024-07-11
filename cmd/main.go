@@ -45,29 +45,6 @@ func main() {
 
 	var wg sync.WaitGroup
 
-	// Создание gRPC сервера
-	grpcServer := grpc.NewServer()
-	routerGrpc := router.NewGrpcApi(grpcServer)
-	_ = routerGrpc
-
-	// Запуск gRPC сервера
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.GRPC.Port))
-	if err != nil {
-		log.Error("ошибка при запуске gRPC сервера", "error", err)
-		return
-	}
-	defer lis.Close()
-
-	log.Info("gRPC сервер запущен", slog.String("addr", lis.Addr().String()))
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if err := grpcServer.Serve(lis); err != nil {
-			log.Error("ошибка при запуске gRPC сервера", "error", err)
-		}
-	}()
-
 	// Создание сервера Echo
 	e := echo.New()
 
@@ -109,6 +86,30 @@ func main() {
 		defer wg.Done()
 		if err := e.Start(cfg.HTTP.Address); err != nil && err != http.ErrServerClosed {
 			log.Error("ошибка при запуске HTTP сервера", "error", err)
+		}
+	}()
+
+	// Создание gRPC сервера
+	grpcServer := grpc.NewServer()
+
+	routerGrpc := router.NewGrpcApi(grpcServer, cfg.KeyPublicPath)
+	_ = routerGrpc
+
+	// Запуск gRPC сервера
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.GRPC.Port))
+	if err != nil {
+		log.Error("ошибка при запуске gRPC сервера", "error", err)
+		return
+	}
+	defer lis.Close()
+
+	log.Info("gRPC сервер запущен", slog.String("addr", lis.Addr().String()))
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := grpcServer.Serve(lis); err != nil {
+			log.Error("ошибка при запуске gRPC сервера", "error", err)
 		}
 	}()
 

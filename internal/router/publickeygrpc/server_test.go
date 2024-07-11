@@ -15,10 +15,13 @@ import (
 	"UserServiceAuth/internal/router/publickeygrpc"
 )
 
-// startTestGRPCServer запускает тестовый gRPC сервер
 func startTestGRPCServer(t *testing.T, port int) (*grpc.Server, net.Listener, chan struct{}) {
 	server := grpc.NewServer()
-	publickeygrpc.NewGrpcApi(server)
+
+	// Path to your public key file
+	publicKeyPath := "./public.pem"
+	grpcService := publickeygrpc.NewGrpcApi(server, publicKeyPath)
+	_ = grpcService
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
@@ -38,9 +41,8 @@ func startTestGRPCServer(t *testing.T, port int) (*grpc.Server, net.Listener, ch
 }
 
 func TestGRPCServer(t *testing.T) {
-	port := 44044
+	port := 44050
 
-	// Запуск тестового сервера
 	server, lis, done := startTestGRPCServer(t, port)
 	defer func() {
 		server.GracefulStop()
@@ -48,7 +50,11 @@ func TestGRPCServer(t *testing.T) {
 		lis.Close()
 	}()
 
-	// Создание gRPC клиента
+	expectedPublicKey, err := publickeygrpc.LoadPublicKeyFromFile("../../../gen/key/public.pem")
+	if err != nil {
+		t.Fatalf("Failed to load expected public key: %v", err)
+	}
+
 	conn, err := grpc.Dial(fmt.Sprintf("localhost:%d", port), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.Fatalf("Failed to connect: %v", err)
@@ -57,18 +63,14 @@ func TestGRPCServer(t *testing.T) {
 
 	client := ssov1.NewGetPublicKeyClient(conn)
 
-	// Создание контекста с таймаутом
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	// Отправка запроса и получение ответа
 	req := &ssov1.PublicKeyRequest{}
 	resp, err := client.PublicKey(ctx, req)
 	if err != nil {
 		t.Fatalf("PublicKey request failed: %v", err)
 	}
 
-	// Проверка ответа
-	expectedPublicKey := "publickey12731723929381"
-	assert.Equal(t, expectedPublicKey, resp.PublicKey, "PublicKey should match")
+	assert.Equal(t, expectedPublicKey, resp.PublicKey, "Received public key does not match expected")
 }

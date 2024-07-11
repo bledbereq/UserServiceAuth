@@ -84,7 +84,6 @@ func (h *HttpRouter) validateMiddleware(next echo.HandlerFunc) echo.HandlerFunc 
 		}
 
 		ctx.Set("validatedBody", body)
-
 		return next(ctx)
 	}
 }
