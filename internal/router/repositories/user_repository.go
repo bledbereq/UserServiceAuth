@@ -41,5 +41,20 @@ func (r *UserRepository) UpdateUserByLogin(login string, updatedUser *models.USE
 }
 
 func (r *UserRepository) SaveToken(token *models.TOKENS) error {
-	return r.db.Create(token).Error
+	return r.db.Where(models.TOKENS{USERID: token.USERID}).FirstOrCreate(token).Error
+}
+
+func (r *UserRepository) DeleteUserByLogin(login string) error {
+	var user models.USERS
+	if err := r.db.Where("login = ?", login).First(&user).Error; err != nil {
+		return err
+	}
+	var token models.TOKENS
+	if err := r.db.Where("user_id = ?", user.USERID).First(&token).Error; err != nil {
+		return err
+	}
+	if err := r.db.Delete(&token).Error; err != nil {
+		return err
+	}
+	return r.db.Delete(&user).Error
 }

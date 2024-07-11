@@ -21,11 +21,12 @@ func NewTokenService(privateKey *rsa.PrivateKey, publicKey *rsa.PublicKey) *Toke
 	}
 }
 
-func (s *TokenService) GenerateToken(username, email, login string) (string, error) {
+func (s *TokenService) GenerateToken(username, email, login string, isadmin bool) (string, error) {
 	claims := jwt.MapClaims{
 		"username": username,
 		"email":    email,
 		"login":    login,
+		"isadmin":  isadmin,
 		"exp":      time.Now().Add(time.Hour * 2).Unix(),
 	}
 

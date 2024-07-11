@@ -16,4 +16,5 @@ type USERS struct {
 	USERNAME string `json:"username"`
 	SURNAME  string `json:"surname"`
 	PASSWORD string `json:"password" validate:"required"`
+	ISADMIN  bool   `gorm:"default:false" json:"isadmin"`
 }
