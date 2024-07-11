@@ -30,6 +30,8 @@ func NewHttpRouter(e *echo.Echo, usecase IHandlerUsecase, validator *validator.V
 	}
 	e.Use(router.validateMiddleware)
 
+	e.Use(router.validateMiddleware)
+
 	e.POST("/login", router.handleLogin)
 	e.POST("/register", router.handleRegister)
 	e.PUT("/update/:login", router.handleUpdateUserByLogin)
