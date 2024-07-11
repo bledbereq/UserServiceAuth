@@ -64,11 +64,11 @@ func (h *HttpRouter) validateMiddleware(next echo.HandlerFunc) echo.HandlerFunc 
 		var body interface{}
 		switch req.URL.Path {
 		case "/login":
-			body = new(LoginRequest)
+			body = new(dto.LoginRequest)
 		case "/register":
-			body = new(RegisterRequest)
+			body = new(dto.RegisterRequest)
 		case "/update/:id":
-			body = new(UpdateRequest)
+			body = new(dto.UpdateRequest)
 		}
 
 		if err := ctx.Bind(body); err != nil {
@@ -89,7 +89,7 @@ func (h *HttpRouter) validateMiddleware(next echo.HandlerFunc) echo.HandlerFunc 
 }
 
 func (h *HttpRouter) handleLogin(ctx echo.Context) error {
-	req := ctx.Get("validatedBody").(*LoginRequest)
+	req := ctx.Get("validatedBody").(*dto.LoginRequest)
 
 	user, err := h.usecase.AuthenticateUser(req.Login, req.Password)
 	if err != nil {
@@ -105,7 +105,7 @@ func (h *HttpRouter) handleLogin(ctx echo.Context) error {
 }
 
 func (h *HttpRouter) handleRegister(ctx echo.Context) error {
-	req := ctx.Get("validatedBody").(*RegisterRequest)
+	req := ctx.Get("validatedBody").(*dto.RegisterRequest)
 
 	user := &dto.USERS{
 		USERNAME: req.Username,
@@ -123,7 +123,7 @@ func (h *HttpRouter) handleRegister(ctx echo.Context) error {
 }
 
 func (h *HttpRouter) handleUpdateUserByID(ctx echo.Context) error {
-	req := ctx.Get("validatedBody").(*UpdateRequest)
+	req := ctx.Get("validatedBody").(*dto.UpdateRequest)
 
 	id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
 	if err != nil {
@@ -145,24 +145,4 @@ func (h *HttpRouter) handleUpdateUserByID(ctx echo.Context) error {
 	}
 
 	return ctx.JSON(http.StatusOK, "Пользователь успешно обновлен")
-}
-
-type LoginRequest struct {
-	Login    string `json:"login" validate:"required"`
-	Password string `json:"password" validate:"required"`
-}
-
-type RegisterRequest struct {
-	Username string `json:"username" validate:"required"`
-	Surname  string `json:"surname" validate:"required"`
-	Email    string `json:"email" validate:"required,email"`
-	Login    string `json:"login" validate:"required"`
-	Password string `json:"password" validate:"required"`
-}
-
-type UpdateRequest struct {
-	Username string `json:"username" validate:"required"`
-	Surname  string `json:"surname" validate:"required"`
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required"`
 }

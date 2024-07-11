@@ -17,3 +17,23 @@ type USERS struct {
 	SURNAME  string `json:"surname"`
 	PASSWORD string `json:"password" validate:"required"`
 }
+
+type LoginRequest struct {
+	Login    string `json:"login" validate:"required"`
+	Password string `json:"password" validate:"required"`
+}
+
+type RegisterRequest struct {
+	Username string `json:"username" validate:"required"`
+	Surname  string `json:"surname" validate:"required"`
+	Email    string `json:"email" validate:"required,email"`
+	Login    string `json:"login" validate:"required"`
+	Password string `json:"password" validate:"required"`
+}
+
+type UpdateRequest struct {
+	Username string `json:"username" validate:"required"`
+	Surname  string `json:"surname" validate:"required"`
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required"`
+}
