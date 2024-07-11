@@ -47,7 +47,7 @@ func TestHandleLogin_ValidRequest(t *testing.T) {
 	rec := httptest.NewRecorder()
 	ctx := e.NewContext(req, rec)
 
-	var body LoginRequest
+	var body dto.LoginRequest
 	if err := json.Unmarshal([]byte(reqBody), &body); err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +82,7 @@ func TestHandleLogin_InvalidRequest(t *testing.T) {
 	rec := httptest.NewRecorder()
 	ctx := e.NewContext(req, rec)
 
-	var body LoginRequest
+	var body dto.LoginRequest
 	if err := json.Unmarshal([]byte(reqBody), &body); err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +108,7 @@ func TestHandleRegister_ValidRequest(t *testing.T) {
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()
 	ctx := e.NewContext(req, rec)
-	var body RegisterRequest
+	var body dto.RegisterRequest
 	if err := json.Unmarshal([]byte(reqBody), &body); err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +147,7 @@ func TestHandleRegister_InvalidRequest(t *testing.T) {
 	rec := httptest.NewRecorder()
 	ctx := e.NewContext(req, rec)
 
-	var body RegisterRequest
+	var body dto.RegisterRequest
 	if err := json.Unmarshal([]byte(reqBody), &body); err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +179,7 @@ func TestHandleUpdateUserByLogin_ValidRequest(t *testing.T) {
 	ctx.SetParamValues("user_login")
 
 	// Set validatedBody in context manually (simulating middleware behavior)
-	var body UpdateRequest
+	var body dto.UpdateRequest
 	if err := json.Unmarshal([]byte(reqBody), &body); err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +211,7 @@ func TestHandleUpdateUserByLogin_InvalidRequest(t *testing.T) {
 	ctx.SetParamNames("login")
 	ctx.SetParamValues("invalid_login")
 
-	var body UpdateRequest
+	var body dto.UpdateRequest
 	err := json.Unmarshal([]byte(reqBody), &body)
 	if err != nil {
 		t.Fatal(err)
