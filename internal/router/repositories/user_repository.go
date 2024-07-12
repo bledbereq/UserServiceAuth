@@ -2,6 +2,7 @@ package repositories
 
 import (
 	models "UserServiceAuth/storage"
+	"errors"
 
 	"gorm.io/gorm"
 )
@@ -41,20 +42,22 @@ func (r *UserRepository) UpdateUserByLogin(login string, updatedUser *models.USE
 }
 
 func (r *UserRepository) SaveToken(token *models.TOKENS) error {
-	return r.db.Where(models.TOKENS{USERID: token.USERID}).FirstOrCreate(token).Error
+	var existingToken models.TOKENS
+	err := r.db.Where(models.TOKENS{USERID: token.USERID}).First(&existingToken).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return r.db.Create(token).Error
+		}
+		return err
+	}
+	return r.db.Model(&existingToken).Updates(token).Error
 }
 
 func (r *UserRepository) DeleteUserByLogin(login string) error {
 	var user models.USERS
 	if err := r.db.Where("login = ?", login).First(&user).Error; err != nil {
 		return err
-	}
-	var token models.TOKENS
-	if err := r.db.Where("user_id = ?", user.USERID).First(&token).Error; err != nil {
-		return err
-	}
-	if err := r.db.Delete(&token).Error; err != nil {
-		return err
+
 	}
 	return r.db.Delete(&user).Error
 }

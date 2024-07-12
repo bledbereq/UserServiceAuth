@@ -27,7 +27,7 @@ func (s *TokenService) GenerateToken(username, email, login string, isadmin bool
 		"email":    email,
 		"login":    login,
 		"isadmin":  isadmin,
-		"exp":      time.Now().Add(time.Hour * 2).Unix(),
+		"exp":      time.Now().Add(time.Minute * 5).Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
