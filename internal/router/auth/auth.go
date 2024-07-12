@@ -2,7 +2,7 @@ package auth
 
 import (
 	"net/http"
-	"strconv"
+	"strings"
 
 	dto "UserServiceAuth/storage"
 
@@ -12,8 +12,8 @@ import (
 
 type IHandlerUsecase interface {
 	RegisterUser(user *dto.USERS) error
-	AuthenticateUser(login, password string) (*dto.USERS, error)
-	UpdateUserByID(id uint, user *dto.USERS) error
+	AuthenticateUser(login, password string) (string, error)
+	UpdateUserByLogin(login, token string, user *dto.USERS) error
 }
 
 type HttpRouter struct {
@@ -28,12 +28,11 @@ func NewHttpRouter(e *echo.Echo, usecase IHandlerUsecase, validator *validator.V
 		validator: validator,
 		usecase:   usecase,
 	}
-
 	e.Use(router.validateMiddleware)
 
 	e.POST("/login", router.handleLogin)
 	e.POST("/register", router.handleRegister)
-	e.PUT("/update/:id", router.handleUpdateUserByID)
+	e.PUT("/update/:login", router.handleUpdateUserByLogin)
 
 	return router
 }
@@ -55,20 +54,22 @@ func (cv *CustomValidator) Validate(i interface{}) error {
 func (h *HttpRouter) validateMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(ctx echo.Context) error {
 		req := ctx.Request()
-
 		contentType := req.Header.Get(echo.HeaderContentType)
 		if contentType != echo.MIMEApplicationJSON {
 			return echo.NewHTTPError(http.StatusBadRequest, "Invalid Content-Type, expected application/json")
 		}
 
 		var body interface{}
-		switch req.URL.Path {
-		case "/login":
+		path := ctx.Path()
+		switch {
+		case strings.HasSuffix(path, "/login"):
 			body = new(dto.LoginRequest)
-		case "/register":
+		case strings.HasSuffix(path, "/register"):
 			body = new(dto.RegisterRequest)
-		case "/update/:id":
+		case strings.HasSuffix(path, "/update/:login"):
 			body = new(dto.UpdateRequest)
+		default:
+			return echo.NewHTTPError(http.StatusBadRequest, "Invalid request path")
 		}
 
 		if err := ctx.Bind(body); err != nil {
@@ -90,17 +91,14 @@ func (h *HttpRouter) validateMiddleware(next echo.HandlerFunc) echo.HandlerFunc 
 
 func (h *HttpRouter) handleLogin(ctx echo.Context) error {
 	req := ctx.Get("validatedBody").(*dto.LoginRequest)
-
-	user, err := h.usecase.AuthenticateUser(req.Login, req.Password)
+	token, err := h.usecase.AuthenticateUser(req.Login, req.Password)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusUnauthorized, map[string]string{"error": err.Error()})
 	}
-	_ = user
-	token := "jwt_token"
 
 	return ctx.JSON(http.StatusOK, map[string]interface{}{
 		"message": "Пользователь успешно аутентифицирован",
-		"user":    token,
+		"token":   token,
 	})
 }
 
@@ -122,12 +120,13 @@ func (h *HttpRouter) handleRegister(ctx echo.Context) error {
 	return ctx.JSON(http.StatusCreated, "Пользователь успешно зарегистрирован")
 }
 
-func (h *HttpRouter) handleUpdateUserByID(ctx echo.Context) error {
+func (h *HttpRouter) handleUpdateUserByLogin(ctx echo.Context) error {
 	req := ctx.Get("validatedBody").(*dto.UpdateRequest)
+	login := ctx.Param("login")
+	token := ctx.Request().Header.Get("Authorization")
 
-	id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "Неверный ID пользователя")
+	if token == "" {
+		return echo.NewHTTPError(http.StatusUnauthorized, "Отсутствует токен авторизации")
 	}
 
 	updatedUser := &dto.USERS{
@@ -137,8 +136,9 @@ func (h *HttpRouter) handleUpdateUserByID(ctx echo.Context) error {
 		PASSWORD: req.Password,
 	}
 
-	if err := h.usecase.UpdateUserByID(uint(id), updatedUser); err != nil {
-		if err.Error() == "user with this id not exists" {
+	err := h.usecase.UpdateUserByLogin(login, token, updatedUser)
+	if err != nil {
+		if err.Error() == "user with this login not exists" {
 			return echo.NewHTTPError(http.StatusNotFound, map[string]string{"error": err.Error()})
 		}
 		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": err.Error()})

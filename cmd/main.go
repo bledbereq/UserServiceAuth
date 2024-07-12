@@ -1,21 +1,23 @@
 package main
 
 import (
+	"flag"
+	"fmt"
+	"os"
+	"sync"
+
 	"UserServiceAuth/internal/config"
 	auth "UserServiceAuth/internal/router/auth"
 	router "UserServiceAuth/internal/router/publickeygrpc"
 	"UserServiceAuth/internal/router/repositories"
 	services "UserServiceAuth/internal/uscase"
+	"UserServiceAuth/keygen"
 	"UserServiceAuth/storage"
 	"context"
-	"flag"
-	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
-	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 	"time"
 
@@ -72,8 +74,27 @@ func main() {
 	db := storage.InitDB(cfg)
 	userRepo := repositories.NewUserRepository(db)
 
-	// Создание сервиса
-	userService := services.NewUserService(userRepo)
+	if _, err := os.Stat(cfg.KeyPrivatePath); os.IsNotExist(err) {
+		fmt.Println("Private key not found, generating a new one...")
+		if err := keygen.GenerateKeyPair(cfg.KeyPrivatePath, cfg.KeyPublicPath); err != nil {
+			fmt.Printf("Error: failed to generate key pair: %v\n", err)
+			return
+		}
+		fmt.Println("Key pair generated successfully.")
+	} else {
+		fmt.Println("Private key already exists.")
+	}
+
+	privateKey, err := keygen.LoadPrivateKeyFromFile(cfg.KeyPrivatePath)
+	if err != nil {
+		log.Error("ошибка при загрузке приватного ключа", "error", err)
+		return
+	}
+
+	tokenService := services.NewTokenService(privateKey, &privateKey.PublicKey)
+
+	// Инициализация UserService с использованием tokenService
+	userService := services.NewUserService(userRepo, tokenService)
 
 	// Создание валидатора
 	validator := validator.New()
