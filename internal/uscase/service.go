@@ -12,6 +12,7 @@ type IUserRepository interface {
 	CreateUser(user *dto.USERS) error
 	GetUserByLogin(login string) (*dto.USERS, error)
 	UpdateUserByLogin(login string, updatedUser *dto.USERS) error
+	DeleteUserByLogin(login string) error
 	SaveToken(token *dto.TOKENS) error
 }
 
@@ -44,12 +45,11 @@ func (s *UserService) AuthenticateUser(login, password string) (string, error) {
 		return "", errors.New("invalid login or password")
 	}
 
-	token, err := s.tokenService.GenerateToken(user.USERNAME, user.EMAIL, user.LOGIN)
+	token, err := s.tokenService.GenerateToken(user.USERNAME, user.EMAIL, user.LOGIN, user.ISADMIN)
 	if err != nil {
 		return "", err
 	}
 
-	// Сохранение токена в БД
 	expTime := time.Now().Add(time.Hour * 1).Unix()
 	tokenRecord := &dto.TOKENS{
 		USERID:       user.USERID,
@@ -68,22 +68,50 @@ func (s *UserService) AuthenticateUser(login, password string) (string, error) {
 func (s *UserService) UpdateUserByLogin(login, token string, updatedUser *dto.USERS) error {
 	claims, err := s.tokenService.ValidateToken(token)
 	if err != nil {
-		return err // Возвращаем ошибку из ValidateToken
+		return err
+	}
+	tokenIsAdmin, isAdminOk := claims["isadmin"].(bool)
+	tokenLogin, loginOk := claims["login"].(string)
+
+	if !loginOk {
+		return errors.New("invalid token: login not found")
 	}
 
-	// Проверяем, что пользователь из токена имеет право на обновление данных
-	tokenLogin, ok := claims["login"].(string)
-	if !ok || tokenLogin != login {
-		return errors.New("token is not authorized for this user")
+	if !isAdminOk || !tokenIsAdmin {
+		if tokenLogin != login {
+			return errors.New("token is not authorized for this user")
+		}
 	}
 
-	existingLogin, err := s.userRepo.GetUserByLogin(login)
+	existingUser, err := s.userRepo.GetUserByLogin(login)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
-	if existingLogin == nil {
-		return errors.New("user with this login not exists")
+	if existingUser == nil {
+		return errors.New("user with this login does not exist")
 	}
 
 	return s.userRepo.UpdateUserByLogin(login, updatedUser)
+}
+
+func (s *UserService) DeleteUserByLogin(login, token string) error {
+	claims, err := s.tokenService.ValidateToken(token)
+	if err != nil {
+		return err
+	}
+	tokenIsAdmin, isAdminOk := claims["isadmin"].(bool)
+
+	if !isAdminOk || !tokenIsAdmin {
+		return errors.New("token is not have admin's root")
+	}
+
+	existingUser, err := s.userRepo.GetUserByLogin(login)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+	if existingUser == nil {
+		return errors.New("user with this login does not exist")
+	}
+
+	return s.userRepo.DeleteUserByLogin(login)
 }

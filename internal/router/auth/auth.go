@@ -14,6 +14,7 @@ type IHandlerUsecase interface {
 	RegisterUser(user *dto.USERS) error
 	AuthenticateUser(login, password string) (string, error)
 	UpdateUserByLogin(login, token string, user *dto.USERS) error
+	DeleteUserByLogin(login, token string) error
 }
 
 type HttpRouter struct {
@@ -33,6 +34,7 @@ func NewHttpRouter(e *echo.Echo, usecase IHandlerUsecase, validator *validator.V
 	e.POST("/login", router.handleLogin)
 	e.POST("/register", router.handleRegister)
 	e.PUT("/update/:login", router.handleUpdateUserByLogin)
+	e.PUT("/delete/:login", router.handleDeleteUserByLogin)
 
 	return router
 }
@@ -68,6 +70,8 @@ func (h *HttpRouter) validateMiddleware(next echo.HandlerFunc) echo.HandlerFunc 
 			body = new(dto.RegisterRequest)
 		case strings.HasSuffix(path, "/update/:login"):
 			body = new(dto.UpdateRequest)
+		case strings.HasSuffix(path, "/delete/:login"):
+			body = new(struct{})
 		default:
 			return echo.NewHTTPError(http.StatusBadRequest, "Invalid request path")
 		}
@@ -133,6 +137,7 @@ func (h *HttpRouter) handleUpdateUserByLogin(ctx echo.Context) error {
 		SURNAME:  req.Surname,
 		EMAIL:    req.Email,
 		PASSWORD: req.Password,
+		LOGIN:    req.Login,
 	}
 
 	err := h.usecase.UpdateUserByLogin(login, token, updatedUser)
@@ -144,4 +149,22 @@ func (h *HttpRouter) handleUpdateUserByLogin(ctx echo.Context) error {
 	}
 
 	return ctx.JSON(http.StatusOK, "Пользователь успешно обновлен")
+}
+func (h *HttpRouter) handleDeleteUserByLogin(ctx echo.Context) error {
+	login := ctx.Param("login")
+	token := ctx.Request().Header.Get("Authorization")
+
+	if token == "" {
+		return echo.NewHTTPError(http.StatusUnauthorized, "Отсутствует токен авторизации")
+	}
+
+	err := h.usecase.DeleteUserByLogin(login, token)
+	if err != nil {
+		if err.Error() == "user with this login not exists" {
+			return echo.NewHTTPError(http.StatusNotFound, map[string]string{"error": err.Error()})
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+
+	return ctx.JSON(http.StatusOK, "Пользователь успешно удален")
 }

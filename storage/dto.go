@@ -16,6 +16,7 @@ type USERS struct {
 	USERNAME string `json:"username"`
 	SURNAME  string `json:"surname"`
 	PASSWORD string `json:"password" validate:"required"`
+	ISADMIN  bool   `gorm:"default:false" json:"isadmin"`
 }
 
 type LoginRequest struct {
@@ -32,8 +33,9 @@ type RegisterRequest struct {
 }
 
 type UpdateRequest struct {
-	Username string `json:"username" validate:"required"`
-	Surname  string `json:"surname" validate:"required"`
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required"`
+	Username string `json:"username"`
+	Surname  string `json:"surname"`
+	Email    string `json:"email" validate:"email"`
+	Password string `json:"password" validate:"required" `
+	Login    string `json:"login" `
 }

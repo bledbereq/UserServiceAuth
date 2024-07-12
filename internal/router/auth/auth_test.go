@@ -36,6 +36,11 @@ func (m *MockHandlerUsecase) UpdateUserByLogin(login, token string, user *dto.US
 	return args.Error(0)
 }
 
+func (m *MockHandlerUsecase) DeleteUserByLogin(login, token string) error {
+	args := m.Called(login, token)
+	return args.Error(0)
+}
+
 func TestHandleLogin_ValidRequest(t *testing.T) {
 	assert := assert.New(t)
 	e := echo.New()
@@ -67,12 +72,12 @@ func TestHandleLogin_ValidRequest(t *testing.T) {
 
 	mockUsecase.AssertExpectations(t)
 }
+
 func TestHandleLogin_InvalidRequest(t *testing.T) {
 	assert := assert.New(t)
 	e := echo.New()
 	mockUsecase := new(MockHandlerUsecase)
 
-	// Утверждаем, что при вызове AuthenticateUser с определёнными параметрами будет возвращаться ошибка
 	mockUsecase.On("AuthenticateUser", "johndoe", "").Return("", errors.New("invalid login or password"))
 
 	router := NewHttpRouter(e, mockUsecase, validator.New())
@@ -127,6 +132,7 @@ func TestHandleRegister_ValidRequest(t *testing.T) {
 
 	mockUsecase.AssertExpectations(t)
 }
+
 func TestHandleRegister_InvalidRequest(t *testing.T) {
 	assert := assert.New(t)
 	e := echo.New()
@@ -178,7 +184,6 @@ func TestHandleUpdateUserByLogin_ValidRequest(t *testing.T) {
 	ctx.SetParamNames("login")
 	ctx.SetParamValues("user_login")
 
-	// Set validatedBody in context manually (simulating middleware behavior)
 	var body dto.UpdateRequest
 	if err := json.Unmarshal([]byte(reqBody), &body); err != nil {
 		t.Fatal(err)
@@ -226,5 +231,82 @@ func TestHandleUpdateUserByLogin_InvalidRequest(t *testing.T) {
 		}
 		assert.Equal(http.StatusUnauthorized, he.Code)
 
+	}
+}
+
+func TestHandleDeleteUserByLogin_ValidRequest(t *testing.T) {
+	assert := assert.New(t)
+	e := echo.New()
+	mockUsecase := new(MockHandlerUsecase)
+	router := NewHttpRouter(e, mockUsecase, validator.New())
+
+	req := httptest.NewRequest(http.MethodPut, "/delete/user_login", nil)
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	req.Header.Set("Authorization", "Bearer mock_jwt_token")
+	rec := httptest.NewRecorder()
+	ctx := e.NewContext(req, rec)
+	ctx.SetParamNames("login")
+	ctx.SetParamValues("user_login")
+
+	mockUsecase.On("DeleteUserByLogin", "user_login", "Bearer mock_jwt_token").Return(nil)
+
+	err := router.handleDeleteUserByLogin(ctx)
+
+	assert.NoError(err)
+	assert.Equal(http.StatusOK, rec.Code)
+
+	expectedResponse := `"Пользователь успешно удален"`
+	assert.JSONEq(expectedResponse, rec.Body.String())
+
+	mockUsecase.AssertExpectations(t)
+}
+
+func TestHandleDeleteUserByLogin_MissingToken(t *testing.T) {
+	assert := assert.New(t)
+	e := echo.New()
+	router := NewHttpRouter(e, &MockHandlerUsecase{}, validator.New())
+
+	req := httptest.NewRequest(http.MethodPut, "/delete/user_login", nil)
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	ctx := e.NewContext(req, rec)
+	ctx.SetParamNames("login")
+	ctx.SetParamValues("user_login")
+
+	err := router.handleDeleteUserByLogin(ctx)
+	if assert.Error(err) {
+		he, ok := err.(*echo.HTTPError)
+		if !ok {
+			t.Fatalf("expected *echo.HTTPError, got %T", err)
+		}
+		assert.Equal(http.StatusUnauthorized, he.Code)
+		assert.Contains(he.Message, "Отсутствует токен авторизации")
+	}
+}
+
+func TestHandleDeleteUserByLogin_UserNotFound(t *testing.T) {
+	assert := assert.New(t)
+	e := echo.New()
+	mockUsecase := new(MockHandlerUsecase)
+	router := NewHttpRouter(e, mockUsecase, validator.New())
+
+	req := httptest.NewRequest(http.MethodPut, "/delete/user_login", nil)
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	req.Header.Set("Authorization", "Bearer mock_jwt_token")
+	rec := httptest.NewRecorder()
+	ctx := e.NewContext(req, rec)
+	ctx.SetParamNames("login")
+	ctx.SetParamValues("user_login")
+
+	mockUsecase.On("DeleteUserByLogin", "user_login", "Bearer mock_jwt_token").Return(errors.New("user with this login not exists"))
+
+	err := router.handleDeleteUserByLogin(ctx)
+	if assert.Error(err) {
+		he, ok := err.(*echo.HTTPError)
+		if !ok {
+			t.Fatalf("expected *echo.HTTPError, got %T", err)
+		}
+		assert.Equal(http.StatusNotFound, he.Code)
+		assert.Contains(he.Message.(map[string]string)["error"], "user with this login not exists")
 	}
 }
