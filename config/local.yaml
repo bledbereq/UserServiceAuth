@@ -1,7 +1,5 @@
-env: "dev" 
-
-storage_path: "./storage/sso.db" 
-
+env: "dev"
+storage_path: "./storage/sso.db"
 token_ttl: 2h
 
 grpc:
@@ -9,7 +7,13 @@ grpc:
   timeout: 30s
 
 http_server:
-  adress: "0.0.0.0:8082"
+  address: userserviceauth-app-1:8082
   timeout: 4s
-  iddle_timeout: 60s
+  idle_timeout: 60s
   
+db:
+  host: db_auth
+  port: 5432
+  user: admin
+  password: root
+  dbname: admin

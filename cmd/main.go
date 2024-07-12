@@ -4,6 +4,9 @@ import (
 	"UserServiceAuth/internal/config"
 	auth "UserServiceAuth/internal/router/auth"
 	router "UserServiceAuth/internal/router/publickeygrpc"
+	"UserServiceAuth/internal/router/repositories"
+	services "UserServiceAuth/internal/uscase"
+	"UserServiceAuth/storage"
 	"context"
 	"flag"
 	"fmt"
@@ -16,6 +19,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
 	"google.golang.org/grpc"
 )
@@ -32,13 +36,10 @@ func main() {
 	}
 
 	cfg := config.MustLoadByPath(configPath)
-	fmt.Println(cfg)
-
 	log := setupLogger(cfg.Env)
 	log.Info("старт приложения",
 		slog.String("env", cfg.Env),
-		slog.Any("cfg", cfg),
-		slog.Int("port", cfg.GRPC.Port))
+		slog.Any("cfg", cfg))
 
 	var wg sync.WaitGroup
 
@@ -68,9 +69,18 @@ func main() {
 	// Создание сервера Echo
 	e := echo.New()
 
-	// Создание роутера
-	httpRouter := auth.NewHttpRouter(e)
-	_ = httpRouter
+	db := storage.InitDB(cfg)
+	userRepo := repositories.NewUserRepository(db)
+
+	// Создание сервиса
+	userService := services.NewUserService(userRepo)
+
+	// Создание валидатора
+	validator := validator.New()
+
+	// Создание и настройка HTTP роутера
+	authRouter := auth.NewHttpRouter(e, userService, validator)
+	_ = authRouter
 
 	// Запуск сервера Echo
 	wg.Add(1)
