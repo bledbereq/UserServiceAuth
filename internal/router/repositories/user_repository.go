@@ -45,6 +45,7 @@ func (r *UserRepository) SaveToken(token *models.TOKENS) error {
 	var existingToken models.TOKENS
 	err := r.db.Where(models.TOKENS{USERID: token.USERID}).First(&existingToken).Error
 	if err != nil {
+
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return r.db.Create(token).Error
 		}
@@ -57,7 +58,18 @@ func (r *UserRepository) DeleteUserByLogin(login string) error {
 	var user models.USERS
 	if err := r.db.Where("login = ?", login).First(&user).Error; err != nil {
 		return err
-
 	}
+
+	var token models.TOKENS
+	if err := r.db.Where("user_id = ?", user.USERID).First(&token).Error; err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+	} else {
+		if err := r.db.Delete(&token).Error; err != nil {
+			return err
+		}
+	}
+
 	return r.db.Delete(&user).Error
 }
